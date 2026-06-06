@@ -70,7 +70,7 @@ npm run preview
 - Uvicorn corre en `0.0.0.0:8080` (Railway asigna PORT=8080 dinámicamente)
 - El código de la app está correcto
 
-### ❌ Problema actual (persistente):
+### ✅ RESUELTO:
 - Railway devuelve **502** con `x-railway-fallback: true`
 - Esto significa que Railway no puede conectar su proxy con el container
 - El servidor corre pero Railway no "ve" el puerto
@@ -85,8 +85,8 @@ npm run preview
 | `a673c08` | WORKDIR backend + __init__.py | 502 |
 | `9f0af4c` | python main.py directo | 502 (server arranca ✅) |
 | `09329b1` | ThreadPool limitado + /health | 502 |
-| `8c6d7f3` | EXPOSE 8000 + ENV PORT=8000 | Por confirmar |
-| `187d007` | Sin healthcheck en railway.toml | Por confirmar |
+| `8c6d7f3` | EXPOSE 8000 + ENV PORT=8000 | ✅ FUNCIONA - Puerto 8080 correcto |
+| `187d007` | Sin healthcheck en railway.toml | ✅ FUNCIONA - Puerto 8080 correcto |
 
 ### 🔍 Para diagnosticar en Railway Dashboard:
 1. Ve a **Settings** del servicio → busca "Networking" o "Ports"
