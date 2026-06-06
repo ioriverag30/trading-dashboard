@@ -742,4 +742,7 @@ async def ws_endpoint(ws: WebSocket):
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("main:app", host="0.0.0.0", port=APP_PORT, reload=False)
+    # Railway Settings is configured to route to port 8000 — always use 8000
+    port = int(os.getenv("PORT", "8000"))
+    logger.info(f"Starting on port {port}")
+    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
