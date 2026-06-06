@@ -12,6 +12,23 @@ import requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
+
+# ── Bypass Yahoo Finance datacenter IP blocking ───────────────────────────────
+_yf_session = requests.Session()
+_yf_session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) "
+                  "Chrome/120.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.5",
+    "Accept-Encoding": "gzip, deflate, br",
+    "DNT": "1",
+    "Connection": "keep-alive",
+})
+
+def _yf_ticker(sym: str):
+    """Return a yfinance Ticker using a browser-like session to avoid blocking."""
+    return yf.Ticker(sym, session=_yf_session)
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -130,7 +147,7 @@ def fetch_yfinance_price(ticker: str) -> Optional[dict]:
     if not yf_sym:
         return None
     try:
-        info = yf.Ticker(yf_sym).fast_info
+        info = _yf_ticker(yf_sym).fast_info
         price = float(info.last_price)
         prev  = float(info.previous_close)
         if price != price or price <= 0:   # NaN / zero guard
@@ -179,7 +196,7 @@ def compute_signal(ticker: str) -> dict:
         return _empty_signal(ticker)
 
     try:
-        df = yf.Ticker(yf_sym).history(period="1y", interval="1d", auto_adjust=True)
+        df = _yf_ticker(yf_sym).history(period="1y", interval="1d", auto_adjust=True)
         if df is None or len(df) < 30:
             return _empty_signal(ticker)
 
@@ -704,7 +721,7 @@ def get_price_history(ticker: str, days: int = 30):
         return {"history": []}
     try:
         period = "3mo" if days <= 90 else "1y"
-        df = yf.Ticker(yf_sym).history(period=period)
+        df = _yf_ticker(yf_sym).history(period=period)
         if df.empty:
             return {"history": []}
         df = df.tail(days)
