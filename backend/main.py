@@ -502,6 +502,108 @@ async def signal_updater():
         i += 1
         await asyncio.sleep(5)
 
+async def market_monitor():
+    """Monitor SPX and VIX — send alert if market drops >2% or VIX spikes."""
+    await asyncio.sleep(120)  # wait for prices to populate
+    loop = asyncio.get_event_loop()
+    last_spx_alert = 0
+    last_vix_alert = 0
+    while True:
+        try:
+            spx = price_cache.get("SPX", {})
+            vix = price_cache.get("VIX", {})
+            spx_chg = spx.get("change_pct", 0)
+            vix_val = vix.get("price", 0)
+            now = time.time()
+
+            # SPX caída > 2%
+            if spx_chg <= -2 and (now - last_spx_alert) > 3600:
+                last_spx_alert = now
+                await loop.run_in_executor(_executor, requests.post,
+                    f"https://ntfy.sh/{NTFY_TOPIC}"
+                )
+                def _send_market_alert():
+                    requests.post(
+                        f"https://ntfy.sh/{NTFY_TOPIC}",
+                        data=f"S&P 500 cae {round(spx_chg,2)}% hoy\nEvita abrir nuevas posiciones en mercado bajista.".encode(),
+                        headers={"Title": "⚠️ MERCADO EN ROJO".encode(), "Priority": "high", "Tags": "warning"},
+                        timeout=8
+                    )
+                await loop.run_in_executor(_executor, _send_market_alert)
+                logger.info(f"🚨 Market alert sent: SPX {spx_chg}%")
+
+            # VIX > 25
+            if vix_val >= 25 and (now - last_vix_alert) > 7200:
+                last_vix_alert = now
+                def _send_vix_alert():
+                    requests.post(
+                        f"https://ntfy.sh/{NTFY_TOPIC}",
+                        data=f"VIX en {round(vix_val,1)} — Alta volatilidad\nReducir tamaño de posiciones y ajustar Stop Loss.".encode(),
+                        headers={"Title": "🔥 ALTA VOLATILIDAD (VIX)".encode(), "Priority": "default", "Tags": "fire"},
+                        timeout=8
+                    )
+                await loop.run_in_executor(_executor, _send_vix_alert)
+                logger.info(f"🔥 VIX alert sent: {vix_val}")
+
+        except Exception as e:
+            logger.warning(f"Market monitor error: {e}")
+        await asyncio.sleep(300)  # check every 5 min
+
+async def daily_summary():
+    """Send a morning summary at 9:00 AM ET with best BUY signals."""
+    while True:
+        try:
+            now_et = datetime.utcnow()
+            # 9am ET = 14:00 UTC (approximate, ignores DST for simplicity)
+            target_h, target_m = 14, 0
+            secs_until = ((target_h * 60 + target_m) - (now_et.hour * 60 + now_et.minute)) * 60 - now_et.second
+            if secs_until < 0:
+                secs_until += 86400  # next day
+            await asyncio.sleep(secs_until)
+
+            # Build summary
+            buys  = [(t, indic_cache[t]) for t in ALL_TICKERS
+                     if t in indic_cache and indic_cache[t].get("signal") == "BUY"]
+            sells = [(t, indic_cache[t]) for t in ALL_TICKERS
+                     if t in indic_cache and indic_cache[t].get("signal") == "SELL"]
+            buys.sort(key=lambda x: x[1].get("buy_count", 0), reverse=True)
+
+            if not buys and not sells:
+                await asyncio.sleep(60)
+                continue
+
+            lines = ["📊 RESUMEN MATUTINO — Dashboard de Inversiones\n"]
+            if buys:
+                lines.append(f"🟢 COMPRAR ({len(buys)}):")
+                for t, s in buys[:5]:
+                    price = price_cache.get(t, {}).get("price", 0)
+                    lines.append(f"  • {t}: ${round(price,2)} ({s['buy_count']}/5 condiciones)")
+            if sells:
+                lines.append(f"\n🔴 VENDER ({len(sells)}):")
+                for t, s in sells[:3]:
+                    price = price_cache.get(t, {}).get("price", 0)
+                    lines.append(f"  • {t}: ${round(price,2)}")
+
+            spx_chg = price_cache.get("SPX", {}).get("change_pct", 0)
+            vix_val = price_cache.get("VIX", {}).get("price", 0)
+            lines.append(f"\nMercado: S&P 500 {'+' if spx_chg>=0 else ''}{round(spx_chg,2)}% | VIX {round(vix_val,1)}")
+
+            loop = asyncio.get_event_loop()
+            body = "\n".join(lines)
+            def _send_summary():
+                requests.post(
+                    f"https://ntfy.sh/{NTFY_TOPIC}",
+                    data=body.encode("utf-8"),
+                    headers={"Title": "☀️ Resumen Matutino".encode(), "Priority": "default", "Tags": "calendar"},
+                    timeout=10
+                )
+            await loop.run_in_executor(_executor, _send_summary)
+            logger.info("📊 Daily summary sent")
+
+        except Exception as e:
+            logger.warning(f"Daily summary error: {e}")
+        await asyncio.sleep(60)  # prevent double-send
+
 async def price_broadcast_loop():
     await asyncio.sleep(15)
     while True:
@@ -537,6 +639,8 @@ async def lifespan(app: FastAPI):
         asyncio.create_task(price_updater())
         asyncio.create_task(signal_updater())
         asyncio.create_task(price_broadcast_loop())
+        asyncio.create_task(market_monitor())
+        asyncio.create_task(daily_summary())
         logger.info("Background tasks started OK")
     except Exception as e:
         logger.error(f"Background task start failed (non-fatal): {e}")
