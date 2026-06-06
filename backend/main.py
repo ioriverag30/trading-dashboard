@@ -527,10 +527,18 @@ async def price_broadcast_loop():
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
-    asyncio.create_task(price_updater())
-    asyncio.create_task(signal_updater())
-    asyncio.create_task(price_broadcast_loop())
+    try:
+        init_db()
+        logger.info("DB initialized OK")
+    except Exception as e:
+        logger.error(f"DB init failed (non-fatal): {e}")
+    try:
+        asyncio.create_task(price_updater())
+        asyncio.create_task(signal_updater())
+        asyncio.create_task(price_broadcast_loop())
+        logger.info("Background tasks started OK")
+    except Exception as e:
+        logger.error(f"Background task start failed (non-fatal): {e}")
     yield
 
 # ─── App ─────────────────────────────────────────────────────────────────────
