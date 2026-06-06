@@ -3,6 +3,7 @@ import time
 import asyncio
 import sqlite3
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 from typing import Optional
 from contextlib import asynccontextmanager
@@ -22,6 +23,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 APP_PORT = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))  # Railway uses PORT
+_executor = ThreadPoolExecutor(max_workers=3)  # limit threads so HTTP stays responsive
 DB_PATH = os.path.join(os.path.dirname(__file__), "dashboard.db")
 
 WATCHLIST = {
@@ -450,27 +452,27 @@ manager = ConnectionManager()
 # ─── Background updaters ──────────────────────────────────────────────────────
 
 async def price_updater():
-    await asyncio.sleep(3)
+    await asyncio.sleep(30)  # give server time to be ready first
     loop = asyncio.get_event_loop()
     i = 0
     while True:
         ticker = ALL_TICKERS[i % len(ALL_TICKERS)]
         try:
-            await loop.run_in_executor(None, refresh_price, ticker)
+            await loop.run_in_executor(_executor, refresh_price, ticker)
         except Exception as e:
             logger.warning(f"Price updater {ticker}: {e}")
         i += 1
-        await asyncio.sleep(4)
+        await asyncio.sleep(6)
 
 async def signal_updater():
-    await asyncio.sleep(20)
+    await asyncio.sleep(60)  # wait for prices to populate first
     loop = asyncio.get_event_loop()
     i = 0
     while True:
         ticker = ALL_TICKERS[i % len(ALL_TICKERS)]
         try:
             old_sig = indic_cache.get(ticker, {}).get("signal", "HOLD")
-            result  = await loop.run_in_executor(None, compute_signal, ticker)
+            result  = await loop.run_in_executor(_executor, compute_signal, ticker)
             new_sig = result.get("signal", "HOLD")
             # Broadcast signal change alert to all connected clients
             if old_sig != new_sig and new_sig in ("BUY", "SELL"):
@@ -488,7 +490,7 @@ async def signal_updater():
                 })
                 # 📲 Push notification to phone
                 await loop.run_in_executor(
-                    None, _send_ntfy,
+                    _executor, _send_ntfy,
                     ticker, new_sig, price, stop_loss, take_profit, reasons, buy_count
                 )
         except Exception as e:
@@ -537,6 +539,10 @@ app = FastAPI(title="Investment Intelligence Dashboard", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
 # ─── REST endpoints ───────────────────────────────────────────────────────────
+
+@app.get("/health")
+def health_check():
+    return {"status": "ok", "port": APP_PORT}
 
 @app.get("/api/watchlist")
 def get_watchlist():
