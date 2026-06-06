@@ -47,7 +47,13 @@
       "Bash(echo \"Status: $?\")",
       "Bash(git -C \"/Users/ivanriveragonzalez/Desktop/Claude Bolsa\" status)",
       "Bash(git init *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(git commit *)",
+      "Bash(git config *)",
+      "Bash(git remote *)",
+      "Bash(git branch *)",
+      "Bash(git push *)",
+      "Bash(curl -s \"https://trading-dashboard-production-be2d.up.railway.app/api/watchlist\")"
     ]
   }
 }
