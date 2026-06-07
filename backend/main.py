@@ -8,7 +8,6 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from typing import Optional
 
-import requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
@@ -28,22 +27,10 @@ APP_PORT = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))
 _executor = ThreadPoolExecutor(max_workers=3)
 DB_PATH   = os.path.join(os.path.dirname(__file__), "dashboard.db")
 
-# ── Bypass Yahoo Finance datacenter IP blocking ───────────────────────────────
-_yf_session = requests.Session()
-_yf_session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) "
-                  "Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
-    "Accept-Language": "en-US,en;q=0.5",
-    "Accept-Encoding": "gzip, deflate, br",
-    "DNT": "1",
-    "Connection": "keep-alive",
-})
-
 def _yf_ticker(sym: str) -> yf.Ticker:
-    """Return a yfinance Ticker using a browser-like session to avoid blocking."""
-    return yf.Ticker(sym, session=_yf_session)
+    """Return a yfinance Ticker. v1.x uses curl_cffi internally (TLS browser fingerprint)
+    so no custom session needed — it bypasses datacenter IP blocking automatically."""
+    return yf.Ticker(sym)
 
 # ─── Watchlist & symbol maps ──────────────────────────────────────────────────
 
