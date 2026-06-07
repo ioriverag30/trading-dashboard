@@ -8,9 +8,50 @@ from contextlib import asynccontextmanager, contextmanager
 from datetime import datetime
 from typing import Optional
 
+import requests
 import yfinance as yf
 import pandas as pd
 import numpy as np
+
+# ── Yahoo Finance direct API session (works from datacenter IPs) ──────────────
+_yf_session = requests.Session()
+_yf_session.headers.update({
+    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
+                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "application/json,text/plain,*/*",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Origin": "https://finance.yahoo.com",
+    "Referer": "https://finance.yahoo.com/",
+})
+
+def _yf_chart(symbol: str, range_: str = "5d", interval: str = "1d") -> Optional[pd.DataFrame]:
+    """
+    Fetch OHLCV data via Yahoo Finance v8 chart API directly.
+    Works from datacenter IPs — no yfinance Ticker needed for price/signal data.
+    Returns a DataFrame with columns: Close, High, Low, Volume (or None on failure).
+    """
+    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
+    try:
+        r = _yf_session.get(url, params={"interval": interval, "range": range_}, timeout=15)
+        if r.status_code != 200:
+            logger.warning(f"_yf_chart {symbol}: HTTP {r.status_code}")
+            return None
+        data  = r.json()
+        result = data["chart"]["result"][0]
+        quote  = result["indicators"]["quote"][0]
+        ts     = result["timestamp"]
+        df = pd.DataFrame({
+            "Close":  quote.get("close",  []),
+            "High":   quote.get("high",   []),
+            "Low":    quote.get("low",    []),
+            "Volume": quote.get("volume", []),
+        }, index=pd.to_datetime(ts, unit="s", utc=True))
+        # drop rows where Close is NaN
+        df = df.dropna(subset=["Close"])
+        return df if len(df) > 0 else None
+    except Exception as e:
+        logger.warning(f"_yf_chart {symbol}: {e}")
+        return None
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -135,29 +176,19 @@ def fetch_crypto_realtime() -> dict:
         return {}
 
 def fetch_yfinance_price(ticker: str) -> Optional[dict]:
-    """
-    Use history(period='5d') instead of fast_info — fast_info returns NaN
-    on datacenter IPs (Railway/Render). history() is more resilient.
-    """
+    """Use Yahoo Finance v8 chart API directly — works from datacenter IPs."""
     yf_sym = YF_SYMBOLS.get(ticker)
     if not yf_sym:
         return None
-    try:
-        df = _yf_ticker(yf_sym).history(period="5d", interval="1d", auto_adjust=True)
-        if df is None or len(df) < 2:
-            return None
-        close = df["Close"].dropna()
-        if len(close) < 2:
-            return None
-        price = float(close.iloc[-1])
-        prev  = float(close.iloc[-2])
-        if price != price or price <= 0:   # NaN / zero guard
-            return None
-        change_pct = ((price - prev) / prev * 100) if prev else 0
-        return {"price": round(price, 4), "change_pct": round(change_pct, 4)}
-    except Exception as e:
-        logger.warning(f"yfinance price error {ticker}: {e}")
+    df = _yf_chart(yf_sym, range_="5d", interval="1d")
+    if df is None or len(df) < 2:
         return None
+    price = float(df["Close"].iloc[-1])
+    prev  = float(df["Close"].iloc[-2])
+    if price <= 0:
+        return None
+    change_pct = ((price - prev) / prev * 100) if prev else 0
+    return {"price": round(price, 4), "change_pct": round(change_pct, 4)}
 
 def refresh_price(ticker: str):
     data = None
@@ -196,14 +227,14 @@ def compute_signal(ticker: str) -> dict:
         return _empty_signal(ticker)
 
     try:
-        df = _yf_ticker(yf_sym).history(period="1y", interval="1d", auto_adjust=True)
+        df = _yf_chart(yf_sym, range_="1y", interval="1d")
         if df is None or len(df) < 30:
             return _empty_signal(ticker)
 
         close  = df["Close"].dropna()
         high   = df["High"].dropna()
         low    = df["Low"].dropna()
-        volume = df["Volume"].dropna()
+        volume = df["Volume"].fillna(0)
 
         # EMAs
         ema20  = float(close.ewm(span=20,  adjust=False).mean().iloc[-1])
@@ -810,9 +841,9 @@ def get_price_history(ticker: str, days: int = 30):
     if not yf_sym:
         return {"history": []}
     try:
-        period = "3mo" if days <= 90 else "1y"
-        df     = _yf_ticker(yf_sym).history(period=period)
-        if df.empty:
+        range_ = "3mo" if days <= 90 else "1y"
+        df     = _yf_chart(yf_sym, range_=range_, interval="1d")
+        if df is None or df.empty:
             return {"history": []}
         df = df.tail(days)
         result = []
