@@ -686,18 +686,26 @@ def health_check():
 
 @app.get("/debug/yf")
 def debug_yf():
-    """Temporary debug: test yfinance fetch for AAPL directly."""
+    """Debug: test direct Yahoo Finance API call from Railway."""
     import traceback
-    try:
-        import yfinance as yf
-        t = yf.Ticker("AAPL")
-        df = t.history(period="5d", interval="1d", auto_adjust=True)
-        if df is None or len(df) == 0:
-            return {"ok": False, "error": "empty dataframe", "rows": 0}
-        price = float(df["Close"].iloc[-1])
-        return {"ok": True, "price": price, "rows": len(df), "yf_version": yf.__version__}
-    except Exception as e:
-        return {"ok": False, "error": str(e), "trace": traceback.format_exc()[-500:]}
+    results = {}
+    for sym in ["AAPL", "^GSPC"]:
+        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
+        try:
+            r = _yf_session.get(url, params={"interval": "1d", "range": "5d"}, timeout=10)
+            results[sym] = {
+                "status": r.status_code,
+                "body_preview": r.text[:300],
+            }
+            if r.status_code == 200:
+                data = r.json()
+                closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
+                closes = [c for c in closes if c]
+                results[sym]["price"] = round(closes[-1], 2) if closes else None
+                results[sym]["ok"] = bool(closes)
+        except Exception as e:
+            results[sym] = {"error": str(e)}
+    return results
 
 @app.get("/api/watchlist")
 def get_watchlist():
