@@ -12,6 +12,8 @@ import {
   fetchSignals, fetchPortfolio, fetchAlerts,
   addPosition, deletePosition, createAlert, deleteAlert
 } from './api.js'
+
+const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api'
 import { useWebSocket } from './useWebSocket.js'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
@@ -331,7 +333,7 @@ export default function App() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const r = await fetch('/api/signal_history').then(r => r.json())
+      const r = await fetch(`${API_BASE}/signal_history`).then(r => r.json())
       setHistory(r.history || [])
     } catch {}
   }, [])
@@ -348,8 +350,8 @@ export default function App() {
     if (!selected) return
     setChartLoading(true)
     Promise.all([
-      fetch(`/api/history/${selected}?days=60`).then(r => r.json()),
-      fetch(`/api/signal/${selected}`).then(r => r.json()),
+      fetch(`${API_BASE}/history/${selected}?days=60`).then(r => r.json()),
+      fetch(`${API_BASE}/signal/${selected}`).then(r => r.json()),
     ]).then(([hist, sig]) => {
       setChartData(hist.history || [])
       setChartLoading(false)

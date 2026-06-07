@@ -148,13 +148,22 @@ def fetch_crypto_realtime() -> dict:
         return {}
 
 def fetch_yfinance_price(ticker: str) -> Optional[dict]:
+    """
+    Use history(period='5d') instead of fast_info — fast_info returns NaN
+    on datacenter IPs (Railway/Render). history() is more resilient.
+    """
     yf_sym = YF_SYMBOLS.get(ticker)
     if not yf_sym:
         return None
     try:
-        info  = _yf_ticker(yf_sym).fast_info
-        price = float(info.last_price)
-        prev  = float(info.previous_close)
+        df = _yf_ticker(yf_sym).history(period="5d", interval="1d", auto_adjust=True)
+        if df is None or len(df) < 2:
+            return None
+        close = df["Close"].dropna()
+        if len(close) < 2:
+            return None
+        price = float(close.iloc[-1])
+        prev  = float(close.iloc[-2])
         if price != price or price <= 0:   # NaN / zero guard
             return None
         change_pct = ((price - prev) / prev * 100) if prev else 0
