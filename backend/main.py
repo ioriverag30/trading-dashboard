@@ -9,49 +9,8 @@ from datetime import datetime
 from typing import Optional
 
 import requests
-import yfinance as yf
 import pandas as pd
 import numpy as np
-
-# ── Yahoo Finance direct API session (works from datacenter IPs) ──────────────
-_yf_session = requests.Session()
-_yf_session.headers.update({
-    "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) "
-                  "AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-    "Accept": "application/json,text/plain,*/*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Origin": "https://finance.yahoo.com",
-    "Referer": "https://finance.yahoo.com/",
-})
-
-def _yf_chart(symbol: str, range_: str = "5d", interval: str = "1d") -> Optional[pd.DataFrame]:
-    """
-    Fetch OHLCV data via Yahoo Finance v8 chart API directly.
-    Works from datacenter IPs — no yfinance Ticker needed for price/signal data.
-    Returns a DataFrame with columns: Close, High, Low, Volume (or None on failure).
-    """
-    url = f"https://query1.finance.yahoo.com/v8/finance/chart/{symbol}"
-    try:
-        r = _yf_session.get(url, params={"interval": interval, "range": range_}, timeout=15)
-        if r.status_code != 200:
-            logger.warning(f"_yf_chart {symbol}: HTTP {r.status_code}")
-            return None
-        data  = r.json()
-        result = data["chart"]["result"][0]
-        quote  = result["indicators"]["quote"][0]
-        ts     = result["timestamp"]
-        df = pd.DataFrame({
-            "Close":  quote.get("close",  []),
-            "High":   quote.get("high",   []),
-            "Low":    quote.get("low",    []),
-            "Volume": quote.get("volume", []),
-        }, index=pd.to_datetime(ts, unit="s", utc=True))
-        # drop rows where Close is NaN
-        df = df.dropna(subset=["Close"])
-        return df if len(df) > 0 else None
-    except Exception as e:
-        logger.warning(f"_yf_chart {symbol}: {e}")
-        return None
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -64,14 +23,87 @@ load_dotenv(dotenv_path=os.path.join(os.path.dirname(__file__), '..', '.env'))
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-APP_PORT = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))
-_executor = ThreadPoolExecutor(max_workers=3)
-DB_PATH   = os.path.join(os.path.dirname(__file__), "dashboard.db")
+APP_PORT        = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))
+FINNHUB_TOKEN   = os.getenv("FINNHUB_TOKEN", "")
+_executor       = ThreadPoolExecutor(max_workers=3)
+DB_PATH         = os.path.join(os.path.dirname(__file__), "dashboard.db")
 
-def _yf_ticker(sym: str) -> yf.Ticker:
-    """Return a yfinance Ticker. v1.x uses curl_cffi internally (TLS browser fingerprint)
-    so no custom session needed — it bypasses datacenter IP blocking automatically."""
-    return yf.Ticker(sym)
+_session = requests.Session()
+_session.headers.update({"User-Agent": "Mozilla/5.0 (compatible; TradingDashboard/1.0)"})
+
+# ─── Finnhub data layer ───────────────────────────────────────────────────────
+
+# Finnhub symbol map — works from any IP, no rate limit issues
+FINNHUB_SYMBOLS = {
+    # US Stocks
+    "NVDA":"NVDA","AAPL":"AAPL","MSFT":"MSFT","GOOGL":"GOOGL","AMZN":"AMZN",
+    "META":"META","TSLA":"TSLA","AMD":"AMD","JPM":"JPM","V":"V","MA":"MA",
+    "LLY":"LLY","COST":"COST","UNH":"UNH","XOM":"XOM","NFLX":"NFLX",
+    "PLTR":"PLTR","COIN":"COIN","ASML":"ASML","BRKB":"BRK.B",
+    # ETFs
+    "SPY":"SPY","QQQ":"QQQ","IWM":"IWM",
+    # Indices via ETF proxy (candles only available for ETFs in free tier)
+    "SPX":"SPY","NDQ":"QQQ","DJI":"DIA","VIX":None,"DXY":None,
+    # Crypto via Finnhub/Binance
+    "BTCUSD":"BINANCE:BTCUSDT","ETHUSD":"BINANCE:ETHUSDT",
+    # Commodities via Finnhub forex
+    "USOIL":"OANDA:BCOUSD","XAUUSD":"OANDA:XAU_USD",
+}
+
+def _finnhub_quote(symbol: str) -> Optional[dict]:
+    """Fetch real-time quote from Finnhub. Returns {price, change_pct} or None."""
+    if not FINNHUB_TOKEN or not symbol:
+        return None
+    try:
+        r = _session.get(
+            "https://finnhub.io/api/v1/quote",
+            params={"symbol": symbol, "token": FINNHUB_TOKEN},
+            timeout=8,
+        )
+        if r.status_code != 200:
+            return None
+        d = r.json()
+        price = d.get("c", 0)
+        prev  = d.get("pc", 0)
+        if not price or price <= 0:
+            return None
+        change_pct = ((price - prev) / prev * 100) if prev else 0
+        return {"price": round(price, 4), "change_pct": round(change_pct, 4)}
+    except Exception as e:
+        logger.warning(f"Finnhub quote {symbol}: {e}")
+        return None
+
+def _finnhub_candles(symbol: str, days: int = 365) -> Optional[pd.DataFrame]:
+    """Fetch daily OHLCV candles from Finnhub. Returns DataFrame or None."""
+    if not FINNHUB_TOKEN or not symbol:
+        return None
+    try:
+        to_   = int(time.time())
+        from_ = to_ - days * 86400
+        # Choose endpoint based on symbol type
+        if ":" in symbol:   # crypto like BINANCE:BTCUSDT
+            endpoint = "https://finnhub.io/api/v1/crypto/candle"
+        else:
+            endpoint = "https://finnhub.io/api/v1/stock/candle"
+        r = _session.get(
+            endpoint,
+            params={"symbol": symbol, "resolution": "D", "from": from_, "to": to_, "token": FINNHUB_TOKEN},
+            timeout=12,
+        )
+        if r.status_code != 200:
+            return None
+        d = r.json()
+        if d.get("s") != "ok" or not d.get("c"):
+            return None
+        df = pd.DataFrame({
+            "Close":  d["c"], "High": d["h"], "Low": d["l"],
+            "Volume": d.get("v", [0]*len(d["c"])),
+        }, index=pd.to_datetime(d["t"], unit="s", utc=True))
+        df = df.dropna(subset=["Close"])
+        return df if len(df) >= 10 else None
+    except Exception as e:
+        logger.warning(f"Finnhub candles {symbol}: {e}")
+        return None
 
 # ─── Watchlist & symbol maps ──────────────────────────────────────────────────
 
@@ -175,27 +207,15 @@ def fetch_crypto_realtime() -> dict:
         logger.warning(f"CoinGecko error: {e}")
         return {}
 
-def fetch_yfinance_price(ticker: str) -> Optional[dict]:
-    """Use Yahoo Finance v8 chart API directly — works from datacenter IPs."""
-    yf_sym = YF_SYMBOLS.get(ticker)
-    if not yf_sym:
-        return None
-    df = _yf_chart(yf_sym, range_="5d", interval="1d")
-    if df is None or len(df) < 2:
-        return None
-    price = float(df["Close"].iloc[-1])
-    prev  = float(df["Close"].iloc[-2])
-    if price <= 0:
-        return None
-    change_pct = ((price - prev) / prev * 100) if prev else 0
-    return {"price": round(price, 4), "change_pct": round(change_pct, 4)}
-
 def refresh_price(ticker: str):
+    """Fetch price for one ticker: CoinGecko for crypto, Finnhub for everything else."""
     data = None
     if ticker in COINGECKO_IDS:
         data = fetch_crypto_realtime().get(ticker)
     if not data:
-        data = fetch_yfinance_price(ticker)
+        fh_sym = FINNHUB_SYMBOLS.get(ticker)
+        if fh_sym:
+            data = _finnhub_quote(fh_sym)
     if data:
         price_cache[ticker] = {**data, "ticker": ticker, "ts": time.time()}
 
@@ -222,12 +242,12 @@ def compute_signal(ticker: str) -> dict:
     if cached and (now - cached["ts"]) < INDIC_TTL:
         return cached
 
-    yf_sym = YF_SYMBOLS.get(ticker)
-    if not yf_sym:
+    fh_sym = FINNHUB_SYMBOLS.get(ticker)
+    if not fh_sym:
         return _empty_signal(ticker)
 
     try:
-        df = _yf_chart(yf_sym, range_="1y", interval="1d")
+        df = _finnhub_candles(fh_sym, days=365)
         if df is None or len(df) < 30:
             return _empty_signal(ticker)
 
@@ -686,25 +706,13 @@ def health_check():
 
 @app.get("/debug/yf")
 def debug_yf():
-    """Debug: test direct Yahoo Finance API call from Railway."""
-    import traceback
-    results = {}
-    for sym in ["AAPL", "^GSPC"]:
-        url = f"https://query1.finance.yahoo.com/v8/finance/chart/{sym}"
-        try:
-            r = _yf_session.get(url, params={"interval": "1d", "range": "5d"}, timeout=10)
-            results[sym] = {
-                "status": r.status_code,
-                "body_preview": r.text[:300],
-            }
-            if r.status_code == 200:
-                data = r.json()
-                closes = data["chart"]["result"][0]["indicators"]["quote"][0]["close"]
-                closes = [c for c in closes if c]
-                results[sym]["price"] = round(closes[-1], 2) if closes else None
-                results[sym]["ok"] = bool(closes)
-        except Exception as e:
-            results[sym] = {"error": str(e)}
+    """Debug: test Finnhub data fetch from Railway."""
+    token_set = bool(FINNHUB_TOKEN)
+    results = {"token_configured": token_set, "token_prefix": FINNHUB_TOKEN[:6] + "..." if token_set else "MISSING"}
+    if token_set:
+        for ticker in ["AAPL", "NVDA"]:
+            q = _finnhub_quote(FINNHUB_SYMBOLS.get(ticker, ticker))
+            results[ticker] = q if q else "failed"
     return results
 
 @app.get("/api/watchlist")
@@ -845,12 +853,11 @@ def delete_alert(aid: int):
 def get_price_history(ticker: str, days: int = 30):
     """Return OHLC daily history for chart rendering."""
     t      = ticker.upper()
-    yf_sym = YF_SYMBOLS.get(t)
-    if not yf_sym:
+    fh_sym = FINNHUB_SYMBOLS.get(t)
+    if not fh_sym:
         return {"history": []}
     try:
-        range_ = "3mo" if days <= 90 else "1y"
-        df     = _yf_chart(yf_sym, range_=range_, interval="1d")
+        df = _finnhub_candles(fh_sym, days=max(days + 10, 100))
         if df is None or df.empty:
             return {"history": []}
         df = df.tail(days)
