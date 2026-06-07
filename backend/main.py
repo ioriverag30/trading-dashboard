@@ -653,6 +653,21 @@ app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], all
 def health_check():
     return {"status": "ok", "port": APP_PORT, "tickers_cached": len(price_cache)}
 
+@app.get("/debug/yf")
+def debug_yf():
+    """Temporary debug: test yfinance fetch for AAPL directly."""
+    import traceback
+    try:
+        import yfinance as yf
+        t = yf.Ticker("AAPL")
+        df = t.history(period="5d", interval="1d", auto_adjust=True)
+        if df is None or len(df) == 0:
+            return {"ok": False, "error": "empty dataframe", "rows": 0}
+        price = float(df["Close"].iloc[-1])
+        return {"ok": True, "price": price, "rows": len(df), "yf_version": yf.__version__}
+    except Exception as e:
+        return {"ok": False, "error": str(e), "trace": traceback.format_exc()[-500:]}
+
 @app.get("/api/watchlist")
 def get_watchlist():
     return {"watchlist": WATCHLIST, "all": ALL_TICKERS}
