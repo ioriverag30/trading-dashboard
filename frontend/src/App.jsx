@@ -38,9 +38,9 @@ const TICKER_NAMES = {
 const ALL_TICKERS = Object.values(WATCHLIST).flat()
 
 const SIGNAL_CFG = {
-  BUY:  { label:'🟢 COMPRAR',  bg:'#052e16', border:'#16a34a', text:'#4ade80', glow:'#16a34a33' },
-  SELL: { label:'🔴 VENDER',   bg:'#450a0a', border:'#dc2626', text:'#f87171', glow:'#dc262633' },
-  HOLD: { label:'🟡 MANTENER', bg:'#1c1a03', border:'#ca8a04', text:'#facc15', glow:'#ca8a0433' },
+  BUY:  { label:'🟢 COMPRAR',  bg:'#0d3d20', border:'#16a34a', text:'#4ade80', glow:'#16a34a33' },
+  SELL: { label:'🔴 VENDER',   bg:'#571717', border:'#dc2626', text:'#f87171', glow:'#dc262633' },
+  HOLD: { label:'🟡 MANTENER', bg:'#2e2a08', border:'#ca8a04', text:'#facc15', glow:'#ca8a0433' },
 }
 
 const fmt  = (n, d=2) => n==null||n!==n ? '–' : n>=1000
@@ -72,12 +72,12 @@ function ConfidenceBar({ buyCount, sellCount, signal }) {
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-        <span style={{ fontSize:10, color:'#64748b', fontWeight:700, textTransform:'uppercase', letterSpacing:.5 }}>
+        <span style={{ fontSize:10, color:'#9aabc4', fontWeight:700, textTransform:'uppercase', letterSpacing:.5 }}>
           Confianza
         </span>
         <span style={{ fontSize:11, color, fontWeight:700 }}>{label}</span>
       </div>
-      <div style={{ background:'#1e293b', borderRadius:20, height:8, overflow:'hidden' }}>
+      <div style={{ background:'#324158', borderRadius:20, height:8, overflow:'hidden' }}>
         <div style={{
           width:`${pct}%`, height:'100%', borderRadius:20,
           background:`linear-gradient(90deg, ${color}88, ${color})`,
@@ -89,9 +89,9 @@ function ConfidenceBar({ buyCount, sellCount, signal }) {
           <div key={n} style={{
             width:14, height:14, borderRadius:'50%', fontSize:8, fontWeight:700,
             display:'flex', alignItems:'center', justifyContent:'center',
-            background: buyCount>=n ? color : '#1e293b',
-            border:`1px solid ${buyCount>=n ? color : '#334155'}`,
-            color: buyCount>=n ? '#fff' : '#475569'
+            background: buyCount>=n ? color : '#324158',
+            border:`1px solid ${buyCount>=n ? color : '#5a6b85'}`,
+            color: buyCount>=n ? '#fff' : '#8294ad'
           }}>{n}</div>
         ))}
       </div>
@@ -121,23 +121,23 @@ function MiniSparkline({ data }) {
 
 function Card({ children, style }) {
   return (
-    <div style={{ background:'#0f172a', border:'1px solid #1e293b', borderRadius:8, padding:12, ...style }}>
+    <div style={{ background:'#1b2539', border:'1px solid #324158', borderRadius:8, padding:12, ...style }}>
       {children}
     </div>
   )
 }
 function StatBox({ label, value, color='#f1f5f9', sub }) {
   return (
-    <div style={{ background:'#1e293b', borderRadius:6, padding:'8px 12px', flex:1 }}>
-      <div style={{ fontSize:10, color:'#64748b', marginBottom:2 }}>{label}</div>
+    <div style={{ background:'#324158', borderRadius:6, padding:'8px 12px', flex:1 }}>
+      <div style={{ fontSize:10, color:'#9aabc4', marginBottom:2 }}>{label}</div>
       <div style={{ fontSize:14, fontWeight:700, color }}>{value}</div>
-      {sub && <div style={{ fontSize:10, color:'#475569', marginTop:1 }}>{sub}</div>}
+      {sub && <div style={{ fontSize:10, color:'#8294ad', marginTop:1 }}>{sub}</div>}
     </div>
   )
 }
 function SectionTitle({ children }) {
   return (
-    <div style={{ fontSize:10, color:'#475569', fontWeight:700, letterSpacing:1,
+    <div style={{ fontSize:10, color:'#8294ad', fontWeight:700, letterSpacing:1,
       textTransform:'uppercase', marginBottom:6 }}>{children}</div>
   )
 }
@@ -145,11 +145,11 @@ function Modal({ title, onClose, children }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:200,
       display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
-      <div style={{ background:'#0f172a', border:'1px solid #334155', borderRadius:10,
+      <div style={{ background:'#1b2539', border:'1px solid #5a6b85', borderRadius:10,
         padding:24, minWidth:340, maxWidth:480, width:'90%' }} onClick={e=>e.stopPropagation()}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
           <h3 style={{ color:'#f1f5f9', fontWeight:700, margin:0 }}>{title}</h3>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#94a3b8', cursor:'pointer' }}>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#bdc9dc', cursor:'pointer' }}>
             <X size={18}/>
           </button>
         </div>
@@ -161,8 +161,8 @@ function Modal({ title, onClose, children }) {
 function FInput({ label, ...p }) {
   return (
     <div style={{ marginBottom:12 }}>
-      <label style={{ display:'block', fontSize:12, color:'#94a3b8', marginBottom:4 }}>{label}</label>
-      <input {...p} style={{ width:'100%', background:'#1e293b', border:'1px solid #334155',
+      <label style={{ display:'block', fontSize:12, color:'#bdc9dc', marginBottom:4 }}>{label}</label>
+      <input {...p} style={{ width:'100%', background:'#324158', border:'1px solid #5a6b85',
         borderRadius:6, padding:'8px 10px', color:'#f1f5f9', fontSize:14, outline:'none',
         boxSizing:'border-box' }}/>
     </div>
@@ -171,8 +171,8 @@ function FInput({ label, ...p }) {
 function FSelect({ label, children, ...p }) {
   return (
     <div style={{ marginBottom:12 }}>
-      <label style={{ display:'block', fontSize:12, color:'#94a3b8', marginBottom:4 }}>{label}</label>
-      <select {...p} style={{ width:'100%', background:'#1e293b', border:'1px solid #334155',
+      <label style={{ display:'block', fontSize:12, color:'#bdc9dc', marginBottom:4 }}>{label}</label>
+      <select {...p} style={{ width:'100%', background:'#324158', border:'1px solid #5a6b85',
         borderRadius:6, padding:'8px 10px', color:'#f1f5f9', fontSize:14, outline:'none' }}>
         {children}
       </select>
@@ -197,7 +197,7 @@ function Toasts({ toasts, onDismiss }) {
         const cfg = SIGNAL_CFG[t.signal] || SIGNAL_CFG.HOLD
         return (
           <div key={t.id} style={{
-            background:'#0f172a', border:`2px solid ${cfg.border}`,
+            background:'#1b2539', border:`2px solid ${cfg.border}`,
             borderRadius:10, padding:'12px 14px', boxShadow:`0 4px 20px ${cfg.glow}`,
             animation:'slideIn .3s ease'
           }}>
@@ -206,23 +206,23 @@ function Toasts({ toasts, onDismiss }) {
                 🔔 {t.ticker} — {cfg.label}
               </span>
               <button onClick={()=>onDismiss(t.id)}
-                style={{ background:'none', border:'none', color:'#64748b', cursor:'pointer' }}>
+                style={{ background:'none', border:'none', color:'#9aabc4', cursor:'pointer' }}>
                 <X size={14}/>
               </button>
             </div>
             {t.reasons?.length > 0 && (
-              <ul style={{ margin:0, padding:'0 0 0 14px', fontSize:11, color:'#94a3b8' }}>
+              <ul style={{ margin:0, padding:'0 0 0 14px', fontSize:11, color:'#bdc9dc' }}>
                 {t.reasons.map((r,i)=><li key={i}>{r}</li>)}
               </ul>
             )}
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               {t.stop_loss > 0 && (
-                <span style={{ fontSize:11, background:'#450a0a', color:'#f87171', padding:'2px 6px', borderRadius:4 }}>
+                <span style={{ fontSize:11, background:'#571717', color:'#f87171', padding:'2px 6px', borderRadius:4 }}>
                   Stop: {fmtU(t.stop_loss)}
                 </span>
               )}
               {t.take_profit > 0 && (
-                <span style={{ fontSize:11, background:'#052e16', color:'#4ade80', padding:'2px 6px', borderRadius:4 }}>
+                <span style={{ fontSize:11, background:'#0d3d20', color:'#4ade80', padding:'2px 6px', borderRadius:4 }}>
                   Objetivo: {fmtU(t.take_profit)}
                 </span>
               )}
@@ -246,7 +246,7 @@ function MarketAlert({ signals, prices }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:6 }}>
       {alerts.map((a,i) => (
-        <div key={i} style={{ background:'#0f172a', border:`1px solid ${a.color}55`,
+        <div key={i} style={{ background:'#1b2539', border:`1px solid ${a.color}55`,
           borderRadius:6, padding:'6px 12px', display:'flex', alignItems:'center', gap:8 }}>
           <span>{a.icon}</span>
           <span style={{ fontSize:12, color:a.color, fontWeight:600 }}>{a.msg}</span>
@@ -454,10 +454,10 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh',
-      background:'#080d18', color:'#e2e8f0', overflow:'hidden', fontFamily:'system-ui,sans-serif' }}>
+      background:'#111827', color:'#e2e8f0', overflow:'hidden', fontFamily:'system-ui,sans-serif' }}>
 
       {/* ══ TOP BAR ══ */}
-      <header style={{ background:'#0a0f1e', borderBottom:'1px solid #1e293b',
+      <header style={{ background:'#151e31', borderBottom:'1px solid #324158',
         padding:'0 16px', height:52, display:'flex', alignItems:'center',
         justifyContent:'space-between', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -470,11 +470,11 @@ export default function App() {
           {portfolio && (
             <>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:10, color:'#475569' }}>PORTAFOLIO</div>
+                <div style={{ fontSize:10, color:'#8294ad' }}>PORTAFOLIO</div>
                 <div style={{ fontWeight:700, fontSize:14, color:'#f1f5f9' }}>{fmtU(portfolio.total_value)}</div>
               </div>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:10, color:'#475569' }}>P&L</div>
+                <div style={{ fontSize:10, color:'#8294ad' }}>P&L</div>
                 <div style={{ fontWeight:700, fontSize:14, color:pctC(portfolio.total_pnl) }}>
                   {portfolio.total_pnl>=0?'+':''}{fmtU(portfolio.total_pnl)}
                   <span style={{ fontSize:10, marginLeft:4 }}>
@@ -486,23 +486,23 @@ export default function App() {
           )}
           {/* Signal pills */}
           <div style={{ display:'flex', gap:5 }}>
-            <span style={{ background:'#052e16', border:'1px solid #16a34a', color:'#4ade80',
+            <span style={{ background:'#0d3d20', border:'1px solid #16a34a', color:'#4ade80',
               padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🟢 {buyCnt}</span>
-            <span style={{ background:'#450a0a', border:'1px solid #dc2626', color:'#f87171',
+            <span style={{ background:'#571717', border:'1px solid #dc2626', color:'#f87171',
               padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🔴 {sellCnt}</span>
           </div>
           {/* Heatmap toggle */}
           <button onClick={() => setShowHeatmap(v => !v)}
             title="Heatmap de señales"
-            style={{ background: showHeatmap ? '#1e3a5f' : 'none',
-              border:`1px solid ${showHeatmap ? '#3b82f6' : '#1e293b'}`,
-              borderRadius:6, padding:'4px 8px', color: showHeatmap ? '#60a5fa' : '#475569', cursor:'pointer' }}>
+            style={{ background: showHeatmap ? '#2c4d77' : 'none',
+              border:`1px solid ${showHeatmap ? '#3b82f6' : '#324158'}`,
+              borderRadius:6, padding:'4px 8px', color: showHeatmap ? '#60a5fa' : '#8294ad', cursor:'pointer' }}>
             <Grid size={14}/>
           </button>
-          <div style={{ fontSize:10, color:'#334155' }}>
+          <div style={{ fontSize:10, color:'#5a6b85' }}>
             {lastUpdate ? lastUpdate.toLocaleTimeString('es-MX') : 'Conectando...'}
           </div>
-          <button onClick={loadAll} style={{ background:'none', border:'none', color:'#475569', cursor:'pointer' }}>
+          <button onClick={loadAll} style={{ background:'none', border:'none', color:'#8294ad', cursor:'pointer' }}>
             <RefreshCw size={14}/>
           </button>
         </div>
@@ -511,9 +511,9 @@ export default function App() {
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
 
         {/* ══ LEFT PANEL ══ */}
-        <aside style={{ width:252, background:'#0a0f1e', borderRight:'1px solid #1e293b',
+        <aside style={{ width:252, background:'#151e31', borderRight:'1px solid #324158',
           display:'flex', flexDirection:'column', flexShrink:0 }}>
-          <div style={{ display:'flex', borderBottom:'1px solid #1e293b' }}>
+          <div style={{ display:'flex', borderBottom:'1px solid #324158' }}>
             {[
               { id:'watchlist', icon:<List size={12}/>,      label:'Lista' },
               { id:'portfolio', icon:<Briefcase size={12}/>, label:'Portafolio' },
@@ -523,7 +523,7 @@ export default function App() {
               <button key={t.id} onClick={() => setLeftTab(t.id)} style={{
                 flex:1, padding:'9px 0', background:'none', border:'none',
                 borderBottom: leftTab===t.id ? '2px solid #3b82f6' : '2px solid transparent',
-                color: leftTab===t.id ? '#60a5fa' : '#475569',
+                color: leftTab===t.id ? '#60a5fa' : '#8294ad',
                 cursor:'pointer', fontSize:11, fontWeight:600,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:4
               }}>{t.icon}{t.label}</button>
@@ -538,7 +538,7 @@ export default function App() {
                 (SIG_ORDER[signals[a]?.signal]??3) - (SIG_ORDER[signals[b]?.signal]??3))
               return (
                 <div key={group}>
-                  <div style={{ fontSize:10, color:'#334155', padding:'6px 10px 2px',
+                  <div style={{ fontSize:10, color:'#5a6b85', padding:'6px 10px 2px',
                     fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>{group}</div>
                   {sorted.map(ticker => {
                     const p   = prices[ticker] || {}
@@ -547,14 +547,14 @@ export default function App() {
                     return (
                       <div key={ticker} onClick={() => setSelected(ticker)} style={{
                         padding:'7px 10px', cursor:'pointer',
-                        background: isSel ? '#13192e' : 'transparent',
+                        background: isSel ? '#202c47' : 'transparent',
                         borderLeft: isSel ? '3px solid #3b82f6' : '3px solid transparent',
                       }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <div>
                             <span style={{ fontWeight:700, fontSize:12, color:'#f1f5f9' }}>{ticker}</span>
                             {TICKER_NAMES[ticker] && (
-                              <span style={{ fontSize:10, color:'#475569', marginLeft:5 }}>{TICKER_NAMES[ticker]}</span>
+                              <span style={{ fontSize:10, color:'#8294ad', marginLeft:5 }}>{TICKER_NAMES[ticker]}</span>
                             )}
                           </div>
                           {sig && <SignalBadge signal={sig.signal}/>}
@@ -573,7 +573,7 @@ export default function App() {
                                 width:6, height:6, borderRadius:'50%',
                                 background: sig.buy_count>=n
                                   ? (sig.signal==='BUY'?'#16a34a':sig.signal==='SELL'?'#dc2626':'#ca8a04')
-                                  : '#1e293b'
+                                  : '#324158'
                               }}/>
                             ))}
                           </div>
@@ -595,11 +595,11 @@ export default function App() {
                   display:'flex', alignItems:'center', justifyContent:'center', gap:5, marginBottom:8
                 }}><Plus size={13}/> Agregar Posición</button>
                 {!portfolio?.positions?.length && (
-                  <p style={{ fontSize:12, color:'#334155', textAlign:'center', marginTop:20 }}>Sin posiciones</p>
+                  <p style={{ fontSize:12, color:'#5a6b85', textAlign:'center', marginTop:20 }}>Sin posiciones</p>
                 )}
                 {portfolio?.positions?.map(pos => (
-                  <div key={pos.id} style={{ background:'#13192e', borderRadius:6,
-                    padding:9, marginBottom:6, border:'1px solid #1e293b' }}>
+                  <div key={pos.id} style={{ background:'#202c47', borderRadius:6,
+                    padding:9, marginBottom:6, border:'1px solid #324158' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <span style={{ fontWeight:700, fontSize:12 }}>{pos.ticker}</span>
@@ -610,7 +610,7 @@ export default function App() {
                         <Trash2 size={12}/>
                       </button>
                     </div>
-                    <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>
+                    <div style={{ fontSize:11, color:'#9aabc4', marginTop:2 }}>
                       {pos.quantity} × {fmtU(pos.entry_price)}
                     </div>
                     <div style={{ fontSize:12, color:pctC(pos.pnl), fontWeight:600, marginTop:2 }}>
@@ -631,7 +631,7 @@ export default function App() {
                   const sigAlerts = alerts.filter(a => a.alert_type?.startsWith('signal_'))
                   return sigAlerts.length > 0 && (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:10, color:'#475569', fontWeight:700, letterSpacing:1,
+                      <div style={{ fontSize:10, color:'#8294ad', fontWeight:700, letterSpacing:1,
                         textTransform:'uppercase', marginBottom:5 }}>🤖 Señales automáticas</div>
                       {sigAlerts.map(a => {
                         const isBuy = a.alert_type === 'signal_buy'
@@ -647,14 +647,14 @@ export default function App() {
                               </div>
                               <button onClick={() => deleteAlert(a.id)
                                 .then(() => fetchAlerts().then(({alerts:al})=>setAlerts(al)))}
-                                style={{ background:'none', border:'none', color:'#475569', cursor:'pointer' }}>
+                                style={{ background:'none', border:'none', color:'#8294ad', cursor:'pointer' }}>
                                 <Trash2 size={11}/>
                               </button>
                             </div>
                             {parts.slice(1).map((p,i) => (
-                              <div key={i} style={{ fontSize:10, color:'#94a3b8', marginTop:2 }}>{p}</div>
+                              <div key={i} style={{ fontSize:10, color:'#bdc9dc', marginTop:2 }}>{p}</div>
                             ))}
-                            <div style={{ fontSize:10, color:'#475569', marginTop:3 }}>
+                            <div style={{ fontSize:10, color:'#8294ad', marginTop:3 }}>
                               {new Date(a.created_at+'Z').toLocaleString('es-MX',
                                 {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
                             </div>
@@ -665,17 +665,17 @@ export default function App() {
                   )
                 })()}
                 {/* Manual price alerts */}
-                <div style={{ fontSize:10, color:'#475569', fontWeight:700, letterSpacing:1,
+                <div style={{ fontSize:10, color:'#8294ad', fontWeight:700, letterSpacing:1,
                   textTransform:'uppercase', marginBottom:5 }}>💰 Alertas de precio</div>
                 <button onClick={() => setShowAddAlert(true)} style={{
-                  width:'100%', background:'#1e293b', border:'1px solid #334155', borderRadius:6,
-                  padding:'7px 0', color:'#94a3b8', fontWeight:600, fontSize:12, cursor:'pointer',
+                  width:'100%', background:'#324158', border:'1px solid #5a6b85', borderRadius:6,
+                  padding:'7px 0', color:'#bdc9dc', fontWeight:600, fontSize:12, cursor:'pointer',
                   display:'flex', alignItems:'center', justifyContent:'center', gap:5, marginBottom:6
                 }}><Plus size={13}/> Nueva alerta de precio</button>
                 {alerts.filter(a => a.alert_type==='price').map(a => (
                   <div key={a.id} style={{
-                    background: a.triggered ? '#0a1a0a' : '#13192e',
-                    border:`1px solid ${a.triggered?'#166534':'#1e293b'}`,
+                    background: a.triggered ? '#13261a' : '#202c47',
+                    border:`1px solid ${a.triggered?'#166534':'#324158'}`,
                     borderRadius:6, padding:8, marginBottom:5
                   }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -689,7 +689,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    <div style={{ fontSize:11, color:'#94a3b8', marginTop:2 }}>
+                    <div style={{ fontSize:11, color:'#bdc9dc', marginTop:2 }}>
                       {a.direction==='above'?'↑ Sobre':'↓ Bajo'} {fmtU(a.target_price)}
                     </div>
                     <div style={{ fontSize:10, color:a.triggered?'#4ade80':'#facc15', marginTop:2 }}>
@@ -715,7 +715,7 @@ export default function App() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <SectionTitle>Heatmap de Señales — Top 20 Acciones</SectionTitle>
                 <button onClick={() => setShowHeatmap(false)}
-                  style={{ background:'none', border:'none', color:'#475569', cursor:'pointer' }}>
+                  style={{ background:'none', border:'none', color:'#8294ad', cursor:'pointer' }}>
                   <X size={14}/>
                 </button>
               </div>
@@ -728,7 +728,7 @@ export default function App() {
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <h2 style={{ fontSize:22, fontWeight:800, color:'#f1f5f9', margin:0 }}>{selected}</h2>
               {TICKER_NAMES[selected] && (
-                <span style={{ fontSize:13, color:'#475569' }}>{TICKER_NAMES[selected]}</span>
+                <span style={{ fontSize:13, color:'#8294ad' }}>{TICKER_NAMES[selected]}</span>
               )}
               {selPrice && (
                 <>
@@ -748,7 +748,7 @@ export default function App() {
           <Card style={{ flex:1, minHeight:0, padding:'10px 8px' }}>
             {(loading || chartLoading) ? (
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center',
-                height:'100%', color:'#334155' }}>Cargando datos...</div>
+                height:'100%', color:'#5a6b85' }}>Cargando datos...</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top:8, right:12, left:8, bottom:4 }}>
@@ -758,12 +758,12 @@ export default function App() {
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#1e293b"/>
-                  <XAxis dataKey="date" tick={{ fill:'#475569', fontSize:9 }} interval="preserveStartEnd"/>
-                  <YAxis domain={['auto','auto']} tick={{ fill:'#334155', fontSize:10 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#324158"/>
+                  <XAxis dataKey="date" tick={{ fill:'#8294ad', fontSize:9 }} interval="preserveStartEnd"/>
+                  <YAxis domain={['auto','auto']} tick={{ fill:'#5a6b85', fontSize:10 }}
                     tickFormatter={v=>`$${fmt(v,0)}`} width={60}/>
                   <Tooltip
-                    contentStyle={{ background:'#13192e', border:'1px solid #334155', borderRadius:6, fontSize:12 }}
+                    contentStyle={{ background:'#202c47', border:'1px solid #5a6b85', borderRadius:6, fontSize:12 }}
                     formatter={v=>[fmtU(v),'Precio']}/>
                   {ind.bb_upper > 0 && <ReferenceLine y={ind.bb_upper} stroke="#ca8a04" strokeDasharray="4 2"
                     label={{ value:'BB+', fill:'#ca8a04', fontSize:9 }}/>}
@@ -795,10 +795,10 @@ export default function App() {
               { label:'EMA 200',     value:fmtU(ind.ema200),  color:'#a78bfa' },
               { label:'BB Superior', value:fmtU(ind.bb_upper),color:'#fbbf24' },
               { label:'BB Inferior', value:fmtU(ind.bb_lower),color:'#fbbf24' },
-              { label:'ATR (14)',    value:fmtU(ind.atr),     color:'#94a3b8' },
+              { label:'ATR (14)',    value:fmtU(ind.atr),     color:'#bdc9dc' },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ background:'#0a0f1e', border:'1px solid #1e293b', borderRadius:6, padding:'7px 10px' }}>
-                <div style={{ fontSize:9, color:'#334155', marginBottom:2 }}>{label}</div>
+              <div key={label} style={{ background:'#151e31', border:'1px solid #324158', borderRadius:6, padding:'7px 10px' }}>
+                <div style={{ fontSize:9, color:'#5a6b85', marginBottom:2 }}>{label}</div>
                 <div style={{ fontSize:13, fontWeight:700, color }}>{value || '–'}</div>
               </div>
             ))}
@@ -806,10 +806,10 @@ export default function App() {
         </main>
 
         {/* ══ RIGHT PANEL ══ */}
-        <aside style={{ width:240, background:'#0a0f1e', borderLeft:'1px solid #1e293b',
+        <aside style={{ width:240, background:'#151e31', borderLeft:'1px solid #324158',
           display:'flex', flexDirection:'column', flexShrink:0, overflowY:'auto' }}>
 
-          <div style={{ display:'flex', borderBottom:'1px solid #1e293b', flexShrink:0 }}>
+          <div style={{ display:'flex', borderBottom:'1px solid #324158', flexShrink:0 }}>
             {[
               { id:'signal',  icon:<Activity size={12}/>, label:'Señal' },
               { id:'history', icon:<Clock size={12}/>,    label:'Historial' },
@@ -817,7 +817,7 @@ export default function App() {
               <button key={t.id} onClick={() => setRightTab(t.id)} style={{
                 flex:1, padding:'9px 0', background:'none', border:'none',
                 borderBottom: rightTab===t.id ? '2px solid #3b82f6' : '2px solid transparent',
-                color: rightTab===t.id ? '#60a5fa' : '#475569',
+                color: rightTab===t.id ? '#60a5fa' : '#8294ad',
                 cursor:'pointer', fontSize:11, fontWeight:600,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:4
               }}>{t.icon}{t.label}</button>
@@ -847,41 +847,41 @@ export default function App() {
                   <div>
                     <SectionTitle>Niveles Clave</SectionTitle>
                     <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                      <div style={{ background:'#1a0a0a', border:'1px solid #7f1d1d', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ background:'#2b1518', border:'1px solid #7f1d1d', borderRadius:6, padding:'8px 10px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
                           <Shield size={12} color="#f87171"/>
-                          <span style={{ fontSize:10, color:'#94a3b8', fontWeight:700 }}>STOP LOSS</span>
+                          <span style={{ fontSize:10, color:'#bdc9dc', fontWeight:700 }}>STOP LOSS</span>
                         </div>
                         <div style={{ fontSize:14, fontWeight:800, color:'#f87171' }}>
                           {fmtU(selSig.stop_loss_buy)}
                         </div>
-                        <div style={{ fontSize:9, color:'#64748b' }}>
+                        <div style={{ fontSize:9, color:'#9aabc4' }}>
                           −{fmtU(selPrice.price - selSig.stop_loss_buy)}
                           ({fmt((selPrice.price - selSig.stop_loss_buy)/selPrice.price*100)}%)
                         </div>
                       </div>
-                      <div style={{ background:'#0a1a0a', border:'1px solid #14532d', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ background:'#13261a', border:'1px solid #1d6b3c', borderRadius:6, padding:'8px 10px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
                           <Target size={12} color="#4ade80"/>
-                          <span style={{ fontSize:10, color:'#94a3b8', fontWeight:700 }}>OBJETIVO (TP)</span>
+                          <span style={{ fontSize:10, color:'#bdc9dc', fontWeight:700 }}>OBJETIVO (TP)</span>
                         </div>
                         <div style={{ fontSize:14, fontWeight:800, color:'#4ade80' }}>
                           {fmtU(selSig.take_profit_buy)}
                         </div>
-                        <div style={{ fontSize:9, color:'#64748b' }}>
+                        <div style={{ fontSize:9, color:'#9aabc4' }}>
                           +{fmtU(selSig.take_profit_buy - selPrice.price)}
                           ({fmt((selSig.take_profit_buy - selPrice.price)/selPrice.price*100)}%)
                         </div>
                       </div>
-                      <div style={{ background:'#13192e', border:'1px solid #1e293b', borderRadius:6, padding:'7px 10px' }}>
-                        <div style={{ fontSize:9, color:'#64748b', marginBottom:3 }}>SOPORTE / RESISTENCIA</div>
-                        <div style={{ fontSize:11, color:'#94a3b8' }}>
+                      <div style={{ background:'#202c47', border:'1px solid #324158', borderRadius:6, padding:'7px 10px' }}>
+                        <div style={{ fontSize:9, color:'#9aabc4', marginBottom:3 }}>SOPORTE / RESISTENCIA</div>
+                        <div style={{ fontSize:11, color:'#bdc9dc' }}>
                           Soporte: <span style={{ color:'#4ade80', fontWeight:700 }}>{fmtU(selSig.support)}</span>
                         </div>
-                        <div style={{ fontSize:11, color:'#94a3b8' }}>
+                        <div style={{ fontSize:11, color:'#bdc9dc' }}>
                           Resistencia: <span style={{ color:'#f87171', fontWeight:700 }}>{fmtU(selSig.resistance)}</span>
                         </div>
-                        <div style={{ fontSize:9, color:'#475569', marginTop:3 }}>
+                        <div style={{ fontSize:9, color:'#8294ad', marginTop:3 }}>
                           ATR: {fmtU(selSig.atr)} (volatilidad diaria)
                         </div>
                       </div>
@@ -917,15 +917,15 @@ export default function App() {
                 {selSig.signal !== 'BUY' && selSig.missing_buy_conditions?.length > 0 && (
                   <div>
                     <SectionTitle>🎯 Falta para COMPRAR</SectionTitle>
-                    <div style={{ background:'#0f172a', border:'1px solid #1e3a5f',
+                    <div style={{ background:'#1b2539', border:'1px solid #2c4d77',
                       borderRadius:6, padding:'8px 10px' }}>
                       {selSig.missing_buy_conditions.map((r,i) => (
-                        <div key={i} style={{ fontSize:11, color:'#94a3b8', marginBottom:3,
+                        <div key={i} style={{ fontSize:11, color:'#bdc9dc', marginBottom:3,
                           display:'flex', gap:5, alignItems:'flex-start' }}>
                           <span style={{ color:'#3b82f6', flexShrink:0 }}>○</span><span>{r}</span>
                         </div>
                       ))}
-                      <div style={{ fontSize:10, color:'#334155', marginTop:6, borderTop:'1px solid #1e293b', paddingTop:5 }}>
+                      <div style={{ fontSize:10, color:'#5a6b85', marginTop:6, borderTop:'1px solid #324158', paddingTop:5 }}>
                         Necesita {Math.max(0, 3 - selSig.buy_count)} condición(es) más
                       </div>
                     </div>
@@ -941,7 +941,7 @@ export default function App() {
                     { s:'HOLD', label:'🟡 Mantener',count:Object.values(signals).filter(x=>x.signal==='HOLD').length },
                   ].map(({ label, count }) => (
                     <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}>
-                      <span style={{ fontSize:12, color:'#94a3b8' }}>{label}</span>
+                      <span style={{ fontSize:12, color:'#bdc9dc' }}>{label}</span>
                       <span style={{ fontSize:12, fontWeight:700, color:'#f1f5f9' }}>{count}</span>
                     </div>
                   ))}
@@ -954,33 +954,33 @@ export default function App() {
               <div>
                 <SectionTitle>Rendimiento de Señales</SectionTitle>
                 {perfStats?.evaluated > 0 && (
-                  <div style={{ background:'#0f172a', border:'1px solid #1e3a5f', borderRadius:6,
+                  <div style={{ background:'#1b2539', border:'1px solid #2c4d77', borderRadius:6,
                     padding:'8px 10px', marginBottom:8 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
-                      <span style={{ fontSize:11, color:'#94a3b8' }}>Señales evaluadas</span>
+                      <span style={{ fontSize:11, color:'#bdc9dc' }}>Señales evaluadas</span>
                       <span style={{ fontSize:11, fontWeight:700, color:'#f1f5f9' }}>{perfStats.evaluated}</span>
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
-                      <span style={{ fontSize:11, color:'#94a3b8' }}>Aciertos</span>
+                      <span style={{ fontSize:11, color:'#bdc9dc' }}>Aciertos</span>
                       <span style={{ fontSize:11, fontWeight:700,
                         color: perfStats.win_rate >= 50 ? '#4ade80' : '#f87171' }}>
                         {perfStats.win_rate}%
                       </span>
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
-                      <span style={{ fontSize:11, color:'#94a3b8' }}>Promedio por señal</span>
+                      <span style={{ fontSize:11, color:'#bdc9dc' }}>Promedio por señal</span>
                       <span style={{ fontSize:11, fontWeight:700,
                         color: perfStats.avg_pct >= 0 ? '#4ade80' : '#f87171' }}>
                         {perfStats.avg_pct >= 0 ? '+' : ''}{perfStats.avg_pct}%
                       </span>
                     </div>
-                    <div style={{ fontSize:9, color:'#475569', marginTop:4, borderTop:'1px solid #1e293b', paddingTop:4 }}>
+                    <div style={{ fontSize:9, color:'#8294ad', marginTop:4, borderTop:'1px solid #324158', paddingTop:4 }}>
                       Si hubieras seguido cada señal (paper trading)
                     </div>
                   </div>
                 )}
                 {!history.length && (
-                  <p style={{ fontSize:11, color:'#334155' }}>
+                  <p style={{ fontSize:11, color:'#5a6b85' }}>
                     Sin señales registradas aún. El sistema irá anotando cada señal
                     de COMPRA/VENTA y aquí verás si habría ganado o perdido.
                   </p>
@@ -988,7 +988,7 @@ export default function App() {
                 {history.map((h,i) => {
                   const cfg = SIGNAL_CFG[h.signal] || SIGNAL_CFG.HOLD
                   return (
-                    <div key={i} style={{ background:'#13192e',
+                    <div key={i} style={{ background:'#202c47',
                       border:`1px solid ${cfg.border}22`, borderRadius:6,
                       padding:'7px 9px', marginBottom:5 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -1003,7 +1003,7 @@ export default function App() {
                           <SignalBadge signal={h.signal}/>
                         </div>
                       </div>
-                      <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>
+                      <div style={{ fontSize:11, color:'#9aabc4', marginTop:2 }}>
                         {fmtU(h.signal_price ?? h.price)} · {new Date(h.ts+'Z').toLocaleString('es-MX',
                           {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
                       </div>
@@ -1059,8 +1059,8 @@ export default function App() {
       <style>{`
         @keyframes slideIn { from { opacity:0; transform:translateX(30px) } to { opacity:1; transform:none } }
         ::-webkit-scrollbar { width:4px }
-        ::-webkit-scrollbar-track { background:#0a0f1e }
-        ::-webkit-scrollbar-thumb { background:#1e293b; border-radius:2px }
+        ::-webkit-scrollbar-track { background:#151e31 }
+        ::-webkit-scrollbar-thumb { background:#324158; border-radius:2px }
         * { box-sizing:border-box }
       `}</style>
     </div>
