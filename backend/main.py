@@ -24,7 +24,8 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 APP_PORT        = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))
-FINNHUB_TOKEN   = os.getenv("FINNHUB_TOKEN", "")
+FINNHUB_TOKEN    = os.getenv("FINNHUB_TOKEN", "")
+TWELVEDATA_TOKEN = os.getenv("TWELVEDATA_TOKEN", "")
 _executor       = ThreadPoolExecutor(max_workers=3)
 DB_PATH         = os.path.join(os.path.dirname(__file__), "dashboard.db")
 
@@ -72,6 +73,67 @@ def _finnhub_quote(symbol: str) -> Optional[dict]:
     except Exception as e:
         logger.warning(f"Finnhub quote {symbol}: {e}")
         return None
+
+# Twelve Data symbol map — candles (Finnhub free tier doesn't include candles)
+TD_SYMBOLS = {
+    "NVDA":"NVDA","AAPL":"AAPL","MSFT":"MSFT","GOOGL":"GOOGL","AMZN":"AMZN",
+    "META":"META","TSLA":"TSLA","AMD":"AMD","JPM":"JPM","V":"V","MA":"MA",
+    "LLY":"LLY","COST":"COST","UNH":"UNH","XOM":"XOM","NFLX":"NFLX",
+    "PLTR":"PLTR","COIN":"COIN","ASML":"ASML","BRKB":"BRK.B",
+    "SPY":"SPY","QQQ":"QQQ","IWM":"IWM",
+    "SPX":"SPY","NDQ":"QQQ","DJI":"DIA","VIX":None,"DXY":None,
+    "BTCUSD":"BTC/USD","ETHUSD":"ETH/USD",
+    "USOIL":None,"XAUUSD":"XAU/USD",
+}
+
+_candle_cache: dict = {}   # ticker -> {"df": DataFrame, "ts": float}
+CANDLE_TTL = 7200          # 2h — daily candles barely change intraday; keeps Twelve Data under 800 req/day
+
+def _twelvedata_candles(symbol: str, days: int = 365) -> Optional[pd.DataFrame]:
+    """Fetch daily OHLCV candles from Twelve Data. Returns DataFrame or None."""
+    if not TWELVEDATA_TOKEN or not symbol:
+        return None
+    try:
+        r = _session.get(
+            "https://api.twelvedata.com/time_series",
+            params={"symbol": symbol, "interval": "1day",
+                    "outputsize": min(days, 5000), "apikey": TWELVEDATA_TOKEN},
+            timeout=12,
+        )
+        if r.status_code != 200:
+            return None
+        d = r.json()
+        vals = d.get("values")
+        if d.get("status") != "ok" or not vals:
+            logger.warning(f"TwelveData {symbol}: {d.get('message', 'no values')}")
+            return None
+        vals = vals[::-1]  # API returns newest first
+        df = pd.DataFrame({
+            "Open":   [float(v["open"])  for v in vals],
+            "Close":  [float(v["close"]) for v in vals],
+            "High":   [float(v["high"])  for v in vals],
+            "Low":    [float(v["low"])   for v in vals],
+            "Volume": [float(v.get("volume") or 0) for v in vals],
+        }, index=pd.to_datetime([v["datetime"] for v in vals], utc=True))
+        df = df.dropna(subset=["Close"])
+        return df if len(df) >= 10 else None
+    except Exception as e:
+        logger.warning(f"TwelveData candles {symbol}: {e}")
+        return None
+
+def fetch_candles(ticker: str, days: int = 365) -> Optional[pd.DataFrame]:
+    """Cached daily candles for a watchlist ticker: Twelve Data first, Finnhub fallback."""
+    now    = time.time()
+    cached = _candle_cache.get(ticker)
+    if cached and (now - cached["ts"]) < CANDLE_TTL:
+        return cached["df"]
+    df = _twelvedata_candles(TD_SYMBOLS.get(ticker), days)
+    if df is None:
+        df = _finnhub_candles(FINNHUB_SYMBOLS.get(ticker), days)
+    if df is not None:
+        _candle_cache[ticker] = {"df": df, "ts": now}
+        return df
+    return cached["df"] if cached else None  # stale data beats no data
 
 def _finnhub_candles(symbol: str, days: int = 365) -> Optional[pd.DataFrame]:
     """Fetch daily OHLCV candles from Finnhub. Returns DataFrame or None."""
@@ -243,12 +305,8 @@ def compute_signal(ticker: str) -> dict:
     if cached and (now - cached["ts"]) < INDIC_TTL:
         return cached
 
-    fh_sym = FINNHUB_SYMBOLS.get(ticker)
-    if not fh_sym:
-        return _empty_signal(ticker)
-
     try:
-        df = _finnhub_candles(fh_sym, days=365)
+        df = fetch_candles(ticker, days=365)
         if df is None or len(df) < 30:
             return _empty_signal(ticker)
 
@@ -548,7 +606,7 @@ async def signal_updater():
         except Exception as e:
             logger.warning(f"Signal updater {ticker}: {e}")
         i += 1
-        await asyncio.sleep(5)
+        await asyncio.sleep(10)  # Twelve Data free tier: max 8 req/min
 
 async def market_monitor():
     """Monitor SPX and VIX — send alert if market drops >2% or VIX spikes."""
@@ -711,19 +769,10 @@ def debug_yf():
         for ticker in ["AAPL", "NVDA"]:
             q = _finnhub_quote(FINNHUB_SYMBOLS.get(ticker, ticker))
             results[ticker] = q if q else "failed"
-        # candle endpoint status (free tier may not include it)
-        try:
-            to_ = int(time.time())
-            r = _session.get(
-                "https://finnhub.io/api/v1/stock/candle",
-                params={"symbol": "AAPL", "resolution": "D",
-                        "from": to_ - 30 * 86400, "to": to_, "token": FINNHUB_TOKEN},
-                timeout=10,
-            )
-            results["candle_status"] = r.status_code
-            results["candle_body"] = r.text[:200]
-        except Exception as e:
-            results["candle_status"] = f"error: {e}"
+    results["twelvedata_configured"] = bool(TWELVEDATA_TOKEN)
+    if TWELVEDATA_TOKEN:
+        df = _twelvedata_candles("AAPL", days=60)
+        results["candles_AAPL"] = f"{len(df)} días OK" if df is not None else "failed"
     return results
 
 @app.get("/api/watchlist")
@@ -901,12 +950,9 @@ def delete_alert(aid: int):
 @app.get("/api/history/{ticker}")
 def get_price_history(ticker: str, days: int = 30):
     """Return OHLC daily history for chart rendering."""
-    t      = ticker.upper()
-    fh_sym = FINNHUB_SYMBOLS.get(t)
-    if not fh_sym:
-        return {"history": []}
+    t = ticker.upper()
     try:
-        df = _finnhub_candles(fh_sym, days=max(days + 10, 100))
+        df = fetch_candles(t, days=365)
         if df is None or df.empty:
             return {"history": []}
         df = df.tail(days)
