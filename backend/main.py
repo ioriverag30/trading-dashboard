@@ -96,6 +96,7 @@ def _finnhub_candles(symbol: str, days: int = 365) -> Optional[pd.DataFrame]:
         if d.get("s") != "ok" or not d.get("c"):
             return None
         df = pd.DataFrame({
+            "Open":   d.get("o", d["c"]),
             "Close":  d["c"], "High": d["h"], "Low": d["l"],
             "Volume": d.get("v", [0]*len(d["c"])),
         }, index=pd.to_datetime(d["t"], unit="s", utc=True))
@@ -566,9 +567,6 @@ async def market_monitor():
             # SPX caída > 2%
             if spx_chg <= -2 and (now - last_spx_alert) > 3600:
                 last_spx_alert = now
-                await loop.run_in_executor(_executor, requests.post,
-                    f"https://ntfy.sh/{NTFY_TOPIC}"
-                )
                 def _send_market_alert():
                     requests.post(
                         f"https://ntfy.sh/{NTFY_TOPIC}",
