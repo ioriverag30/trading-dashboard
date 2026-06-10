@@ -711,6 +711,19 @@ def debug_yf():
         for ticker in ["AAPL", "NVDA"]:
             q = _finnhub_quote(FINNHUB_SYMBOLS.get(ticker, ticker))
             results[ticker] = q if q else "failed"
+        # candle endpoint status (free tier may not include it)
+        try:
+            to_ = int(time.time())
+            r = _session.get(
+                "https://finnhub.io/api/v1/stock/candle",
+                params={"symbol": "AAPL", "resolution": "D",
+                        "from": to_ - 30 * 86400, "to": to_, "token": FINNHUB_TOKEN},
+                timeout=10,
+            )
+            results["candle_status"] = r.status_code
+            results["candle_body"] = r.text[:200]
+        except Exception as e:
+            results["candle_status"] = f"error: {e}"
     return results
 
 @app.get("/api/watchlist")
