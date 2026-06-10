@@ -288,6 +288,182 @@ function SignalHeatmap({ signals, prices, onSelect }) {
   )
 }
 
+// ─── Vista de Rendimiento (paper trading) ────────────────────────────────────
+function PerfView({ onClose, onSelect }) {
+  const [data,         setData]         = useState(null)
+  const [tickerFilter, setTickerFilter] = useState('ALL')
+  const [statusFilter, setStatusFilter] = useState('ALL')
+
+  useEffect(() => {
+    fetch(`${API_BASE}/signal_performance`).then(r => r.json())
+      .then(setData).catch(() => setData({ trades:[], stats:{}, per_ticker:{} }))
+  }, [])
+
+  if (!data) return (
+    <div style={{ position:'fixed', inset:0, background:'#111827', zIndex:150,
+      display:'flex', alignItems:'center', justifyContent:'center', color:'#8294ad' }}>
+      Cargando rendimiento…
+    </div>
+  )
+
+  const { trades = [], stats = {}, per_ticker = {} } = data
+  const tickers  = Object.keys(per_ticker).sort()
+  const filtered = trades.filter(t =>
+    (tickerFilter === 'ALL' || t.ticker === tickerFilter) &&
+    (statusFilter === 'ALL' || t.status === statusFilter))
+  const fStats = (() => {  // stats for current filter
+    const scored = filtered.filter(t => t.pct != null)
+    const wins   = scored.filter(t => t.pct > 0)
+    return {
+      pnl:  scored.reduce((s,t) => s + t.pnl_usd, 0),
+      win:  scored.length ? Math.round(wins.length / scored.length * 100) : null,
+      avg:  scored.length ? scored.reduce((s,t) => s + t.pct, 0) / scored.length : null,
+      days: filtered.length ? filtered.reduce((s,t) => s + t.days_held, 0) / filtered.length : null,
+    }
+  })()
+  const fmtDate = ts => new Date(ts + 'Z').toLocaleDateString('es-MX', { day:'numeric', month:'short' })
+  const money   = v => v == null ? '–'
+    : `${v < 0 ? '-' : '+'}$${Math.abs(v).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
+  const chip = (active) => ({
+    padding:'5px 14px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer',
+    background: active ? '#2c4d77' : '#202c47',
+    border: `1px solid ${active ? '#3b82f6' : '#324158'}`,
+    color: active ? '#60a5fa' : '#9aabc4',
+  })
+
+  return (
+    <div style={{ position:'fixed', inset:0, background:'#111827', zIndex:150,
+      display:'flex', flexDirection:'column', overflow:'hidden' }}>
+      {/* Header */}
+      <div style={{ background:'#151e31', borderBottom:'1px solid #324158', padding:'12px 20px',
+        display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
+        <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+          <Activity size={18} color="#3b82f6"/>
+          <span style={{ fontWeight:800, fontSize:16, color:'#f1f5f9' }}>Rendimiento de Señales — Paper Trading</span>
+        </div>
+        <button onClick={onClose} style={{ background:'#202c47', border:'1px solid #324158',
+          borderRadius:6, padding:'6px 14px', color:'#bdc9dc', cursor:'pointer', fontSize:13,
+          display:'flex', alignItems:'center', gap:6 }}><X size={14}/> Cerrar</button>
+      </div>
+
+      <div style={{ flex:1, overflowY:'auto', padding:20, maxWidth:1100, width:'100%', margin:'0 auto', boxSizing:'border-box' }}>
+
+        {/* Stat cards (respond to filters) */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, marginBottom:18 }}>
+          <StatBox label="GANANCIA TOTAL (simulada)" color={pctC(fStats.pnl)}
+            value={money(fStats.pnl)}
+            sub={`invirtiendo $${(stats.capital_per_trade || 1000).toLocaleString()} por señal`}/>
+          <StatBox label="ACIERTOS" color={fStats.win >= 50 ? '#4ade80' : '#f87171'}
+            value={fStats.win != null ? `${fStats.win}%` : '–'} sub="trades con ganancia"/>
+          <StatBox label="PROMEDIO POR TRADE" color={pctC(fStats.avg)}
+            value={fStats.avg != null ? `${fStats.avg>=0?'+':''}${fmt(fStats.avg)}%` : '–'}/>
+          <StatBox label="DÍAS EN POSICIÓN" value={fStats.days != null ? `${fmt(fStats.days,1)} días` : '–'}
+            sub="promedio holdeando"/>
+          <StatBox label="OPERACIONES" value={`${filtered.length}`}
+            sub={`${filtered.filter(t=>t.status==='open').length} abiertas · ${filtered.filter(t=>t.status==='closed').length} cerradas`}/>
+        </div>
+
+        {/* Filters */}
+        <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
+          <select value={tickerFilter} onChange={e => setTickerFilter(e.target.value)}
+            style={{ background:'#202c47', border:'1px solid #324158', borderRadius:6,
+              padding:'6px 10px', color:'#f1f5f9', fontSize:13, outline:'none' }}>
+            <option value="ALL">Todas las acciones</option>
+            {tickers.map(t => <option key={t} value={t}>{t} — {TICKER_NAMES[t] || t}</option>)}
+          </select>
+          {[['ALL','Todas'],['open','Abiertas'],['closed','Cerradas']].map(([v,l]) => (
+            <button key={v} onClick={() => setStatusFilter(v)} style={chip(statusFilter===v)}>{l}</button>
+          ))}
+        </div>
+
+        {/* Per-ticker summary (only without ticker filter) */}
+        {tickerFilter === 'ALL' && tickers.length > 1 && (
+          <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
+            {tickers.map(t => {
+              const s = per_ticker[t]
+              return (
+                <div key={t} onClick={() => setTickerFilter(t)} style={{
+                  background:'#1b2539', border:'1px solid #324158', borderRadius:8,
+                  padding:'8px 12px', cursor:'pointer', minWidth:110 }}>
+                  <div style={{ fontWeight:800, fontSize:13, color:'#f1f5f9' }}>{t}</div>
+                  <div style={{ fontSize:11, color:pctC(s.total_pnl_usd), fontWeight:700 }}>
+                    {s.total_pnl_usd>=0?'+':''}{fmtU(s.total_pnl_usd)}
+                  </div>
+                  <div style={{ fontSize:10, color:'#8294ad' }}>{s.trades} trade{s.trades!==1?'s':''}</div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        {/* Trades table */}
+        {!filtered.length ? (
+          <div style={{ textAlign:'center', color:'#5a6b85', padding:40, fontSize:14 }}>
+            Aún no hay operaciones registradas con este filtro.<br/>
+            <span style={{ fontSize:12 }}>Cada señal de COMPRA abre una posición simulada y cada VENTA la cierra.</span>
+          </div>
+        ) : (
+          <div style={{ background:'#1b2539', border:'1px solid #324158', borderRadius:10, overflow:'hidden' }}>
+            <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
+              <thead>
+                <tr style={{ background:'#202c47', color:'#8294ad', fontSize:11, textTransform:'uppercase', letterSpacing:.5 }}>
+                  {['Activo','Estado','Entrada','Salida','Días','Resultado %','Resultado $'].map(h => (
+                    <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontWeight:700 }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {filtered.map((t, i) => (
+                  <tr key={i} onClick={() => { onSelect(t.ticker); onClose() }}
+                    style={{ borderTop:'1px solid #2a3850', cursor:'pointer' }}
+                    onMouseEnter={e => e.currentTarget.style.background='#202c47'}
+                    onMouseLeave={e => e.currentTarget.style.background='transparent'}>
+                    <td style={{ padding:'9px 12px', fontWeight:800, color:'#f1f5f9' }}>
+                      {t.ticker}
+                      <span style={{ fontSize:10, color:'#8294ad', marginLeft:6 }}>{TICKER_NAMES[t.ticker]}</span>
+                    </td>
+                    <td style={{ padding:'9px 12px' }}>
+                      <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:10,
+                        background: t.status==='open' ? '#2c4d77' : '#324158',
+                        color: t.status==='open' ? '#60a5fa' : '#bdc9dc' }}>
+                        {t.status==='open' ? '● Abierta' : 'Cerrada'}
+                      </span>
+                    </td>
+                    <td style={{ padding:'9px 12px', color:'#bdc9dc' }}>
+                      {fmtU(t.entry_price)}<span style={{ color:'#8294ad', fontSize:11 }}> · {fmtDate(t.entry_ts)}</span>
+                    </td>
+                    <td style={{ padding:'9px 12px', color:'#bdc9dc' }}>
+                      {t.exit_price ? <>
+                        {fmtU(t.exit_price)}
+                        <span style={{ color:'#8294ad', fontSize:11 }}>
+                          {t.exit_ts ? ` · ${fmtDate(t.exit_ts)}` : ' · actual'}
+                        </span>
+                      </> : '–'}
+                    </td>
+                    <td style={{ padding:'9px 12px', color:'#bdc9dc' }}>{fmt(t.days_held,1)}</td>
+                    <td style={{ padding:'9px 12px', fontWeight:700, color:pctC(t.pct) }}>
+                      {t.pct != null ? `${t.pct>=0?'+':''}${fmt(t.pct)}%` : '–'}
+                    </td>
+                    <td style={{ padding:'9px 12px', fontWeight:700, color:pctC(t.pnl_usd) }}>
+                      {money(t.pnl_usd)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+
+        <p style={{ fontSize:11, color:'#5a6b85', marginTop:14 }}>
+          📋 Simulación: cada señal de COMPRA invierte ${(stats.capital_per_trade||1000).toLocaleString()} hipotéticos;
+          la señal de VENTA cierra la posición. Las posiciones abiertas se valoran al precio actual.
+          Esto es paper trading — ningún dinero real está en juego.
+        </p>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────────────
 export default function App() {
   const [prices,       setPrices]      = useState({})
@@ -308,6 +484,9 @@ export default function App() {
   const [showAddPos,   setShowAddPos]  = useState(false)
   const [showAddAlert, setShowAddAlert]= useState(false)
   const [showHeatmap,  setShowHeatmap] = useState(false)
+  const [showPerf,     setShowPerf]    = useState(false)
+  const [search,       setSearch]      = useState('')
+  const [sigFilter,    setSigFilter]   = useState('ALL')
   const [posForm,      setPosForm]     = useState({ ticker:'AAPL', entry_price:'', quantity:'', entry_date: new Date().toISOString().split('T')[0] })
   const [alertForm,    setAlertForm]   = useState({ ticker:'AAPL', alert_type:'price', target_price:'', direction:'above' })
   const notified    = useRef(new Set())
@@ -491,6 +670,14 @@ export default function App() {
             <span style={{ background:'#571717', border:'1px solid #dc2626', color:'#f87171',
               padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🔴 {sellCnt}</span>
           </div>
+          {/* Performance view toggle */}
+          <button onClick={() => setShowPerf(true)}
+            title="Rendimiento de señales (paper trading)"
+            style={{ background:'none', border:'1px solid #324158',
+              borderRadius:6, padding:'4px 10px', color:'#8294ad', cursor:'pointer',
+              display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:700 }}>
+            <TrendingUp size={14}/> Rendimiento
+          </button>
           {/* Heatmap toggle */}
           <button onClick={() => setShowHeatmap(v => !v)}
             title="Heatmap de señales"
@@ -530,11 +717,38 @@ export default function App() {
             ))}
           </div>
 
+          {/* Search + signal filter */}
+          {leftTab === 'watchlist' && (
+            <div style={{ padding:'8px 8px 4px', borderBottom:'1px solid #2a3850' }}>
+              <input value={search} onChange={e => setSearch(e.target.value)}
+                placeholder="🔍 Buscar acción…"
+                style={{ width:'100%', background:'#202c47', border:'1px solid #324158',
+                  borderRadius:6, padding:'6px 9px', color:'#f1f5f9', fontSize:12,
+                  outline:'none', boxSizing:'border-box', marginBottom:6 }}/>
+              <div style={{ display:'flex', gap:4 }}>
+                {[['ALL','Todas','#9aabc4'],['BUY','🟢 Comprar','#4ade80'],
+                  ['SELL','🔴 Vender','#f87171'],['HOLD','🟡 Mant.','#facc15']].map(([v,l,c]) => (
+                  <button key={v} onClick={() => setSigFilter(v)} style={{
+                    flex:1, padding:'4px 0', borderRadius:5, fontSize:10, fontWeight:700,
+                    cursor:'pointer', whiteSpace:'nowrap',
+                    background: sigFilter===v ? '#2c4d77' : 'transparent',
+                    border:`1px solid ${sigFilter===v ? '#3b82f6' : '#324158'}`,
+                    color: sigFilter===v ? '#60a5fa' : c }}>{l}</button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div style={{ flex:1, overflowY:'auto', padding:'6px 0' }}>
 
             {/* WATCHLIST */}
             {leftTab === 'watchlist' && Object.entries(WATCHLIST).map(([group, tickers]) => {
-              const sorted = [...tickers].sort((a,b) =>
+              const q = search.trim().toLowerCase()
+              const visible = tickers.filter(t =>
+                (!q || t.toLowerCase().includes(q) || (TICKER_NAMES[t]||'').toLowerCase().includes(q)) &&
+                (sigFilter === 'ALL' || signals[t]?.signal === sigFilter))
+              if (!visible.length) return null
+              const sorted = [...visible].sort((a,b) =>
                 (SIG_ORDER[signals[a]?.signal]??3) - (SIG_ORDER[signals[b]?.signal]??3))
               return (
                 <div key={group}>
@@ -1053,6 +1267,8 @@ export default function App() {
           </form>
         </Modal>
       )}
+
+      {showPerf && <PerfView onClose={() => setShowPerf(false)} onSelect={setSelected}/>}
 
       <Toasts toasts={toasts} onDismiss={id => setToasts(prev => prev.filter(t => t.id !== id))}/>
 

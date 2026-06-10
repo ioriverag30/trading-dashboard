@@ -815,41 +815,94 @@ def get_signal_history(limit: int = 50):
     ]}
 
 @app.get("/api/signal_performance")
-def get_signal_performance():
-    """Paper trading scoreboard: how each recorded signal performed vs current price."""
+def get_signal_performance(capital_per_trade: float = 1000.0):
+    """Paper trading scoreboard: signals as trades (BUY opens, SELL closes).
+
+    Each trade simulates investing `capital_per_trade` USD at the BUY signal.
+    Open trades are valued at the current cached price.
+    """
     with db_conn() as con:
         cur = con.execute(
             "SELECT ticker, signal, buy_count, sell_count, price, ts "
-            "FROM signal_history ORDER BY ts DESC LIMIT 200"
+            "FROM signal_history ORDER BY ts ASC LIMIT 1000"
         )
         rows = cur.fetchall()
-    entries, wins, total_pct = [], 0, 0.0
-    evaluated = 0
-    for ticker, signal, buy_count, sell_count, sig_price, ts in rows:
+
+    # raw entries (newest first) for the compact side list
+    entries = []
+    for ticker, signal, buy_count, sell_count, sig_price, ts in reversed(rows):
         current = price_cache.get(ticker, {}).get("price", 0)
         pct = None
         if sig_price and sig_price > 0 and current > 0:
             raw = (current - sig_price) / sig_price * 100
-            # a SELL signal "wins" if price fell afterwards
             pct = round(raw if signal == "BUY" else -raw, 2)
-            evaluated += 1
-            total_pct += pct
-            if pct > 0:
-                wins += 1
         entries.append({
             "ticker": ticker, "signal": signal,
             "buy_count": buy_count, "sell_count": sell_count,
             "signal_price": sig_price, "current_price": current,
             "pct_since": pct, "ts": ts,
         })
+
+    # pair BUY -> SELL into trades per ticker
+    open_pos: dict = {}   # ticker -> {entry_price, entry_ts}
+    trades = []
+    for ticker, signal, _, _, sig_price, ts in rows:
+        if not sig_price or sig_price <= 0:
+            continue
+        if signal == "BUY" and ticker not in open_pos:
+            open_pos[ticker] = {"entry_price": sig_price, "entry_ts": ts}
+        elif signal == "SELL" and ticker in open_pos:
+            pos = open_pos.pop(ticker)
+            trades.append({"ticker": ticker, "status": "closed",
+                           "entry_price": pos["entry_price"], "entry_ts": pos["entry_ts"],
+                           "exit_price": sig_price, "exit_ts": ts})
+    now_iso = datetime.utcnow().isoformat()
+    for ticker, pos in open_pos.items():
+        current = price_cache.get(ticker, {}).get("price", 0)
+        trades.append({"ticker": ticker, "status": "open",
+                       "entry_price": pos["entry_price"], "entry_ts": pos["entry_ts"],
+                       "exit_price": current if current > 0 else None, "exit_ts": None})
+
+    def _days(a: str, b: str) -> float:
+        try:
+            return round((datetime.fromisoformat(b) - datetime.fromisoformat(a)).total_seconds() / 86400, 1)
+        except Exception:
+            return 0.0
+
+    for t in trades:
+        t["days_held"] = _days(t["entry_ts"], t["exit_ts"] or now_iso)
+        if t["exit_price"]:
+            pct = (t["exit_price"] - t["entry_price"]) / t["entry_price"] * 100
+            t["pct"] = round(pct, 2)
+            t["pnl_usd"] = round(capital_per_trade * pct / 100, 2)
+        else:
+            t["pct"] = None
+            t["pnl_usd"] = None
+    trades.sort(key=lambda t: t["entry_ts"], reverse=True)
+
+    # aggregate stats (overall + per ticker)
+    def _agg(ts_):
+        scored = [t for t in ts_ if t["pct"] is not None]
+        closed = [t for t in ts_ if t["status"] == "closed"]
+        wins   = [t for t in scored if t["pct"] > 0]
+        return {
+            "trades": len(ts_), "closed": len(closed), "open": len(ts_) - len(closed),
+            "win_rate": round(len(wins) / len(scored) * 100, 1) if scored else None,
+            "avg_pct": round(sum(t["pct"] for t in scored) / len(scored), 2) if scored else None,
+            "total_pnl_usd": round(sum(t["pnl_usd"] for t in scored), 2) if scored else 0,
+            "avg_days": round(sum(t["days_held"] for t in ts_) / len(ts_), 1) if ts_ else None,
+        }
+
+    per_ticker = {}
+    for t in trades:
+        per_ticker.setdefault(t["ticker"], []).append(t)
+
     return {
         "entries": entries,
-        "stats": {
-            "total_signals": len(entries),
-            "evaluated": evaluated,
-            "win_rate": round(wins / evaluated * 100, 1) if evaluated else None,
-            "avg_pct": round(total_pct / evaluated, 2) if evaluated else None,
-        },
+        "trades": trades,
+        "stats": {**_agg(trades), "total_signals": len(entries),
+                  "capital_per_trade": capital_per_trade},
+        "per_ticker": {k: _agg(v) for k, v in per_ticker.items()},
     }
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
