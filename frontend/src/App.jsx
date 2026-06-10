@@ -295,6 +295,7 @@ export default function App() {
   const [portfolio,    setPortfolio]   = useState(null)
   const [alerts,       setAlerts]      = useState([])
   const [history,      setHistory]     = useState([])
+  const [perfStats,    setPerfStats]   = useState(null)
   const [selected,     setSelected]    = useState('AAPL')
   const [leftTab,      setLeftTab]     = useState('watchlist')
   const [rightTab,     setRightTab]    = useState('signal')
@@ -333,8 +334,9 @@ export default function App() {
 
   const loadHistory = useCallback(async () => {
     try {
-      const r = await fetch(`${API_BASE}/signal_history`).then(r => r.json())
-      setHistory(r.history || [])
+      const r = await fetch(`${API_BASE}/signal_performance`).then(r => r.json())
+      setHistory(r.entries || [])
+      setPerfStats(r.stats || null)
     } catch {}
   }, [])
 
@@ -950,9 +952,38 @@ export default function App() {
             {/* SIGNAL HISTORY */}
             {rightTab === 'history' && (
               <div>
-                <SectionTitle>Señales Recientes</SectionTitle>
+                <SectionTitle>Rendimiento de Señales</SectionTitle>
+                {perfStats?.evaluated > 0 && (
+                  <div style={{ background:'#0f172a', border:'1px solid #1e3a5f', borderRadius:6,
+                    padding:'8px 10px', marginBottom:8 }}>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
+                      <span style={{ fontSize:11, color:'#94a3b8' }}>Señales evaluadas</span>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#f1f5f9' }}>{perfStats.evaluated}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
+                      <span style={{ fontSize:11, color:'#94a3b8' }}>Aciertos</span>
+                      <span style={{ fontSize:11, fontWeight:700,
+                        color: perfStats.win_rate >= 50 ? '#4ade80' : '#f87171' }}>
+                        {perfStats.win_rate}%
+                      </span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
+                      <span style={{ fontSize:11, color:'#94a3b8' }}>Promedio por señal</span>
+                      <span style={{ fontSize:11, fontWeight:700,
+                        color: perfStats.avg_pct >= 0 ? '#4ade80' : '#f87171' }}>
+                        {perfStats.avg_pct >= 0 ? '+' : ''}{perfStats.avg_pct}%
+                      </span>
+                    </div>
+                    <div style={{ fontSize:9, color:'#475569', marginTop:4, borderTop:'1px solid #1e293b', paddingTop:4 }}>
+                      Si hubieras seguido cada señal (paper trading)
+                    </div>
+                  </div>
+                )}
                 {!history.length && (
-                  <p style={{ fontSize:11, color:'#334155' }}>Sin señales registradas aún</p>
+                  <p style={{ fontSize:11, color:'#334155' }}>
+                    Sin señales registradas aún. El sistema irá anotando cada señal
+                    de COMPRA/VENTA y aquí verás si habría ganado o perdido.
+                  </p>
                 )}
                 {history.map((h,i) => {
                   const cfg = SIGNAL_CFG[h.signal] || SIGNAL_CFG.HOLD
@@ -962,10 +993,18 @@ export default function App() {
                       padding:'7px 9px', marginBottom:5 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                         <span style={{ fontWeight:700, fontSize:12 }}>{h.ticker}</span>
-                        <SignalBadge signal={h.signal}/>
+                        <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                          {h.pct_since != null && (
+                            <span style={{ fontSize:11, fontWeight:800,
+                              color: h.pct_since >= 0 ? '#4ade80' : '#f87171' }}>
+                              {h.pct_since >= 0 ? '+' : ''}{h.pct_since}%
+                            </span>
+                          )}
+                          <SignalBadge signal={h.signal}/>
+                        </div>
                       </div>
                       <div style={{ fontSize:11, color:'#64748b', marginTop:2 }}>
-                        {fmtU(h.price)} · {new Date(h.ts+'Z').toLocaleString('es-MX',
+                        {fmtU(h.signal_price ?? h.price)} · {new Date(h.ts+'Z').toLocaleString('es-MX',
                           {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
                       </div>
                     </div>

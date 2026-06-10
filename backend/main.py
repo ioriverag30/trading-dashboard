@@ -752,6 +752,44 @@ def get_signal_history(limit: int = 50):
         for r in rows
     ]}
 
+@app.get("/api/signal_performance")
+def get_signal_performance():
+    """Paper trading scoreboard: how each recorded signal performed vs current price."""
+    with db_conn() as con:
+        cur = con.execute(
+            "SELECT ticker, signal, buy_count, sell_count, price, ts "
+            "FROM signal_history ORDER BY ts DESC LIMIT 200"
+        )
+        rows = cur.fetchall()
+    entries, wins, total_pct = [], 0, 0.0
+    evaluated = 0
+    for ticker, signal, buy_count, sell_count, sig_price, ts in rows:
+        current = price_cache.get(ticker, {}).get("price", 0)
+        pct = None
+        if sig_price and sig_price > 0 and current > 0:
+            raw = (current - sig_price) / sig_price * 100
+            # a SELL signal "wins" if price fell afterwards
+            pct = round(raw if signal == "BUY" else -raw, 2)
+            evaluated += 1
+            total_pct += pct
+            if pct > 0:
+                wins += 1
+        entries.append({
+            "ticker": ticker, "signal": signal,
+            "buy_count": buy_count, "sell_count": sell_count,
+            "signal_price": sig_price, "current_price": current,
+            "pct_since": pct, "ts": ts,
+        })
+    return {
+        "entries": entries,
+        "stats": {
+            "total_signals": len(entries),
+            "evaluated": evaluated,
+            "win_rate": round(wins / evaluated * 100, 1) if evaluated else None,
+            "avg_pct": round(total_pct / evaluated, 2) if evaluated else None,
+        },
+    }
+
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 
 class PositionIn(BaseModel):
