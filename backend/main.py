@@ -432,7 +432,7 @@ def compute_signal(ticker: str) -> dict:
 
 # ─── Notifications & persistence ─────────────────────────────────────────────
 
-NTFY_TOPIC = "Trading-Alerts"
+NTFY_TOPIC = os.getenv("NTFY_TOPIC", "Trading-Alerts")
 
 def _send_ntfy(ticker, signal, price, stop_loss, take_profit, reasons, buy_count):
     """Send push notification via ntfy.sh — free, no account needed."""
