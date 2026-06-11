@@ -293,6 +293,8 @@ function PerfView({ onClose, onSelect }) {
   const [data,         setData]         = useState(null)
   const [tickerFilter, setTickerFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [dateFrom,     setDateFrom]     = useState('')
+  const [dateTo,       setDateTo]       = useState('')
 
   useEffect(() => {
     fetch(`${API_BASE}/signal_performance`).then(r => r.json())
@@ -307,21 +309,67 @@ function PerfView({ onClose, onSelect }) {
   )
 
   const { trades = [], stats = {}, per_ticker = {} } = data
+  const capital  = stats.capital_per_trade || 1000
   const tickers  = Object.keys(per_ticker).sort()
   const filtered = trades.filter(t =>
     (tickerFilter === 'ALL' || t.ticker === tickerFilter) &&
-    (statusFilter === 'ALL' || t.status === statusFilter))
-  const fStats = (() => {  // stats for current filter
-    const scored = filtered.filter(t => t.pct != null)
-    const wins   = scored.filter(t => t.pct > 0)
+    (statusFilter === 'ALL' || t.status === statusFilter) &&
+    (!dateFrom || t.entry_ts.slice(0,10) >= dateFrom) &&
+    (!dateTo   || t.entry_ts.slice(0,10) <= dateTo))
+
+  // Análisis financiero del filtro actual
+  const fStats = (() => {
+    const open      = filtered.filter(t => t.status === 'open')
+    const closed    = filtered.filter(t => t.status === 'closed')
+    const openVal   = open.filter(t => t.pnl_usd != null)
+    const winners   = closed.filter(t => (t.pct ?? 0) > 0)
+    const losers    = closed.filter(t => (t.pct ?? 0) <= 0)
+    const realized  = closed.reduce((s,t) => s + (t.pnl_usd || 0), 0)
+    const unrealized= openVal.reduce((s,t) => s + (t.pnl_usd || 0), 0)
+    const capOpen   = open.length * capital
+    const capClosed = closed.length * capital
     return {
-      pnl:  scored.reduce((s,t) => s + t.pnl_usd, 0),
-      win:  scored.length ? Math.round(wins.length / scored.length * 100) : null,
-      avg:  scored.length ? scored.reduce((s,t) => s + t.pct, 0) / scored.length : null,
-      days: filtered.length ? filtered.reduce((s,t) => s + t.days_held, 0) / filtered.length : null,
+      capOpen, capClosed,
+      realized,   realizedPct:   capClosed ? realized   / capClosed * 100 : null,
+      unrealized, unrealizedPct: capOpen   ? unrealized / capOpen   * 100 : null,
+      total: realized + unrealized,
+      totalPct: (capOpen + capClosed) ? (realized + unrealized) / (capOpen + capClosed) * 100 : null,
+      win: closed.length ? Math.round(winners.length / closed.length * 100) : null,
+      nWin: winners.length, nLose: losers.length,
+      daysToWin:  winners.length ? winners.reduce((s,t) => s + t.days_held, 0) / winners.length : null,
+      daysAll: filtered.length ? filtered.reduce((s,t) => s + t.days_held, 0) / filtered.length : null,
+      open, closed,
     }
   })()
+
+  // P&L acumulado de operaciones cerradas (orden cronológico de cierre)
+  const cumData = (() => {
+    const closed = [...fStats.closed].filter(t => t.exit_ts)
+      .sort((a,b) => a.exit_ts.localeCompare(b.exit_ts))
+    let acc = 0
+    return closed.map(t => ({ name: `${t.ticker} ${new Date(t.exit_ts+'Z').toLocaleDateString('es-MX',{day:'numeric',month:'short'})}`,
+      v: +(acc += t.pnl_usd).toFixed(2) }))
+  })()
+
+  const downloadCSV = () => {
+    const head = ['Activo','Estado','Fecha entrada','Precio entrada','Stop Loss','Take Profit',
+                  'Fecha salida','Precio salida','Motivo cierre','Dias','Resultado %','Resultado USD']
+    const rows = filtered.map(t => [
+      t.ticker, t.status === 'open' ? 'Abierta' : 'Cerrada',
+      t.entry_ts?.slice(0,16).replace('T',' '), t.entry_price, t.stop_loss ?? '', t.take_profit ?? '',
+      t.exit_ts ? t.exit_ts.slice(0,16).replace('T',' ') : '', t.exit_price ?? '',
+      t.exit_reason === 'take_profit' ? 'Take Profit' : t.exit_reason === 'stop_loss' ? 'Stop Loss'
+        : t.exit_reason === 'sell_signal' ? 'Señal de venta' : '',
+      t.days_held, t.pct ?? '', t.pnl_usd ?? '',
+    ])
+    const csv  = '﻿' + [head, ...rows].map(r => r.join(';')).join('\n')
+    const url  = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }))
+    const a    = Object.assign(document.createElement('a'), { href:url, download:`rendimiento_${new Date().toISOString().slice(0,10)}.csv` })
+    a.click(); URL.revokeObjectURL(url)
+  }
+
   const fmtDate = ts => new Date(ts + 'Z').toLocaleDateString('es-MX', { day:'numeric', month:'short' })
+  const fmtDT   = ts => new Date(ts + 'Z').toLocaleString('es-MX', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })
   const money   = v => v == null ? '–'
     : `${v < 0 ? '-' : '+'}$${Math.abs(v).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
   const chip = (active) => ({
@@ -348,19 +396,34 @@ function PerfView({ onClose, onSelect }) {
 
       <div style={{ flex:1, overflowY:'auto', padding:20, maxWidth:1100, width:'100%', margin:'0 auto', boxSizing:'border-box' }}>
 
-        {/* Stat cards (respond to filters) */}
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(150px, 1fr))', gap:10, marginBottom:18 }}>
-          <StatBox label="GANANCIA TOTAL (simulada)" color={pctC(fStats.pnl)}
-            value={money(fStats.pnl)}
-            sub={`invirtiendo $${(stats.capital_per_trade || 1000).toLocaleString()} por señal`}/>
-          <StatBox label="ACIERTOS" color={fStats.win >= 50 ? '#4ade80' : '#f87171'}
-            value={fStats.win != null ? `${fStats.win}%` : '–'} sub="trades con ganancia"/>
-          <StatBox label="PROMEDIO POR TRADE" color={pctC(fStats.avg)}
-            value={fStats.avg != null ? `${fStats.avg>=0?'+':''}${fmt(fStats.avg)}%` : '–'}/>
-          <StatBox label="DÍAS EN POSICIÓN" value={fStats.days != null ? `${fmt(fStats.days,1)} días` : '–'}
-            sub="promedio holdeando"/>
+        {/* Fila 1: capital y resultados */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:10, marginBottom:10 }}>
+          <StatBox label="CAPITAL INVERTIDO (abiertas)" value={`$${fStats.capOpen.toLocaleString()}`}
+            sub={`${fStats.open.length} posiciones × $${capital.toLocaleString()}`}/>
+          <StatBox label="GANANCIA REALIZADA" color={pctC(fStats.realized)}
+            value={money(fStats.realized)}
+            sub={fStats.realizedPct != null
+              ? `${fStats.realizedPct>=0?'+':''}${fmt(fStats.realizedPct)}% sobre $${fStats.capClosed.toLocaleString()} cerrados`
+              : 'sin operaciones cerradas aún'}/>
+          <StatBox label="GANANCIA NO REALIZADA" color={pctC(fStats.unrealized)}
+            value={money(fStats.unrealized)}
+            sub={fStats.unrealizedPct != null
+              ? `${fStats.unrealizedPct>=0?'+':''}${fmt(fStats.unrealizedPct)}% de las abiertas (flotante)` : '–'}/>
+          <StatBox label="RESULTADO TOTAL" color={pctC(fStats.total)}
+            value={money(fStats.total)}
+            sub={fStats.totalPct != null ? `${fStats.totalPct>=0?'+':''}${fmt(fStats.totalPct)}% del capital usado` : '–'}/>
+        </div>
+        {/* Fila 2: calidad del sistema */}
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(170px, 1fr))', gap:10, marginBottom:18 }}>
+          <StatBox label="ACIERTOS (cerradas)" color={fStats.win == null ? '#f1f5f9' : fStats.win >= 50 ? '#4ade80' : '#f87171'}
+            value={fStats.win != null ? `${fStats.win}%` : '–'}
+            sub={fStats.closed.length ? `${fStats.nWin} ganadas · ${fStats.nLose} perdidas` : 'aún sin cierres'}/>
+          <StatBox label="TIEMPO HASTA LA GANANCIA" value={fStats.daysToWin != null ? `${fmt(fStats.daysToWin,1)} días` : '–'}
+            sub="promedio de las ganadoras"/>
+          <StatBox label="DÍAS EN POSICIÓN" value={fStats.daysAll != null ? `${fmt(fStats.daysAll,1)} días` : '–'}
+            sub="promedio de todas"/>
           <StatBox label="OPERACIONES" value={`${filtered.length}`}
-            sub={`${filtered.filter(t=>t.status==='open').length} abiertas · ${filtered.filter(t=>t.status==='closed').length} cerradas`}/>
+            sub={`${fStats.open.length} abiertas · ${fStats.closed.length} cerradas`}/>
         </div>
 
         {/* Filters */}
@@ -374,7 +437,45 @@ function PerfView({ onClose, onSelect }) {
           {[['ALL','Todas'],['open','Abiertas'],['closed','Cerradas']].map(([v,l]) => (
             <button key={v} onClick={() => setStatusFilter(v)} style={chip(statusFilter===v)}>{l}</button>
           ))}
+          <span style={{ fontSize:11, color:'#aebbd1', marginLeft:8 }}>Desde</span>
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            style={{ background:'#3e4d6b', border:'1px solid #51617f', borderRadius:6,
+              padding:'5px 8px', color:'#f1f5f9', fontSize:12, outline:'none', colorScheme:'dark' }}/>
+          <span style={{ fontSize:11, color:'#aebbd1' }}>Hasta</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            style={{ background:'#3e4d6b', border:'1px solid #51617f', borderRadius:6,
+              padding:'5px 8px', color:'#f1f5f9', fontSize:12, outline:'none', colorScheme:'dark' }}/>
+          {(dateFrom || dateTo) && (
+            <button onClick={() => { setDateFrom(''); setDateTo('') }} style={chip(false)}>✕ Fechas</button>
+          )}
+          <button onClick={downloadCSV} style={{ ...chip(false), marginLeft:'auto',
+            display:'flex', alignItems:'center', gap:5 }}>⬇ Exportar Excel (CSV)</button>
         </div>
+
+        {/* Ganancia acumulada (cerradas) */}
+        {cumData.length >= 2 && (
+          <div style={{ background:'#38465f', border:'1px solid #51617f', borderRadius:10,
+            padding:'12px 14px', marginBottom:16 }}>
+            <SectionTitle>Ganancia realizada acumulada</SectionTitle>
+            <ResponsiveContainer width="100%" height={140}>
+              <AreaChart data={cumData} margin={{ top:4, right:8, left:0, bottom:0 }}>
+                <defs>
+                  <linearGradient id="cumG" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="5%" stopColor="#4ade80" stopOpacity={.4}/>
+                    <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
+                  </linearGradient>
+                </defs>
+                <CartesianGrid stroke="#4d5d7c" strokeDasharray="3 3"/>
+                <XAxis dataKey="name" tick={{ fill:'#aebbd1', fontSize:10 }}/>
+                <YAxis tick={{ fill:'#aebbd1', fontSize:10 }} tickFormatter={v => `$${v}`}/>
+                <Tooltip contentStyle={{ background:'#313f58', border:'1px solid #51617f', borderRadius:6 }}
+                  labelStyle={{ color:'#d4dcea' }} formatter={v => [`$${v}`, 'P&L acumulado']}/>
+                <ReferenceLine y={0} stroke="#93a2bb"/>
+                <Area type="monotone" dataKey="v" stroke="#4ade80" strokeWidth={2} fill="url(#cumG)"/>
+              </AreaChart>
+            </ResponsiveContainer>
+          </div>
+        )}
 
         {/* Per-ticker summary (only without ticker filter) */}
         {tickerFilter === 'ALL' && tickers.length > 1 && (
@@ -430,7 +531,7 @@ function PerfView({ onClose, onSelect }) {
                       </span>
                     </td>
                     <td style={{ padding:'9px 12px', color:'#d4dcea' }}>
-                      {fmtU(t.entry_price)}<span style={{ color:'#aebbd1', fontSize:11 }}> · {fmtDate(t.entry_ts)}</span>
+                      {fmtU(t.entry_price)}<span style={{ color:'#aebbd1', fontSize:11 }}> · {fmtDT(t.entry_ts)}</span>
                     </td>
                     <td style={{ padding:'9px 12px', fontSize:11 }}>
                       <span style={{ color:'#f87171' }}>{t.stop_loss ? fmtU(t.stop_loss) : '–'}</span>
@@ -441,7 +542,7 @@ function PerfView({ onClose, onSelect }) {
                       {t.exit_price ? <>
                         {fmtU(t.exit_price)}
                         <span style={{ color:'#aebbd1', fontSize:11 }}>
-                          {t.exit_ts ? ` · ${fmtDate(t.exit_ts)}` : ' · actual'}
+                          {t.exit_ts ? ` · ${fmtDT(t.exit_ts)}` : ' · actual'}
                         </span>
                         {t.exit_reason && (
                           <span style={{ marginLeft:6, fontSize:10, fontWeight:700, padding:'1px 6px',
