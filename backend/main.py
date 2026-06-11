@@ -27,7 +27,8 @@ APP_PORT        = int(os.getenv("PORT", os.getenv("APP_PORT", "8000")))
 FINNHUB_TOKEN    = os.getenv("FINNHUB_TOKEN", "")
 TWELVEDATA_TOKEN = os.getenv("TWELVEDATA_TOKEN", "")
 _executor       = ThreadPoolExecutor(max_workers=3)
-DB_PATH         = os.path.join(os.path.dirname(__file__), "dashboard.db")
+# DATA_DIR: set to a mounted volume path (e.g. /data on Railway) so the DB survives redeploys
+DB_PATH         = os.path.join(os.getenv("DATA_DIR", os.path.dirname(__file__)), "dashboard.db")
 
 _session = requests.Session()
 _session.headers.update({"User-Agent": "Mozilla/5.0 (compatible; TradingDashboard/1.0)"})
@@ -246,6 +247,22 @@ def init_db():
                 price REAL,
                 ts TEXT NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS paper_trades (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                ticker TEXT NOT NULL,
+                entry_price REAL NOT NULL,
+                entry_ts TEXT NOT NULL,
+                stop_loss REAL,
+                take_profit REAL,
+                exit_price REAL,
+                exit_ts TEXT,
+                exit_reason TEXT,
+                status TEXT NOT NULL DEFAULT 'open'
+            );
+            CREATE TABLE IF NOT EXISTS signal_state (
+                ticker TEXT PRIMARY KEY,
+                signal TEXT NOT NULL
+            );
         """)
         # migrate: add alert_type column if missing
         try:
@@ -414,14 +431,25 @@ def compute_signal(ticker: str) -> dict:
         }
         indic_cache[ticker] = result
 
-        # Detect signal change → save history + push notification
+        # Detect signal change → save history + open/close paper trade
         prev_sig_str = signal_prev.get(ticker)
+        live_price   = price_cache.get(ticker, {}).get("price", 0) or price_now
         if prev_sig_str is not None and prev_sig_str != signal and signal in ("BUY", "SELL"):
             _save_signal_event(ticker, signal, buy_count, sell_count, price_now)
             _save_auto_alert(ticker, signal, price_now,
                              stop_loss_buy  if signal == "BUY" else stop_loss_sell,
                              take_profit_buy if signal == "BUY" else take_profit_sell,
                              active_buy_reasons if signal == "BUY" else active_sell_reasons)
+            if signal == "BUY":
+                _open_paper_trade(ticker, live_price,
+                                  live_price - 2 * atr, live_price + 3 * atr)
+            else:
+                _close_paper_trade(ticker, live_price, "sell_signal")
+        elif prev_sig_str is None and signal == "BUY":
+            # first sight of a ticker already in BUY: open quietly (no alert spam)
+            _open_paper_trade(ticker, live_price, live_price - 2 * atr, live_price + 3 * atr)
+        if prev_sig_str != signal:
+            _save_signal_state(ticker, signal)
         signal_prev[ticker] = signal
 
         return result
@@ -487,6 +515,75 @@ def _save_signal_event(ticker, signal, buy_count, sell_count, price):
         logger.info(f"🔔 NUEVA SEÑAL: {ticker} → {signal} @ ${price}")
     except Exception as e:
         logger.warning(f"Signal history save error: {e}")
+
+# ─── Paper trading (operaciones simuladas) ───────────────────────────────────
+
+def _open_paper_trade(ticker, price, stop_loss, take_profit):
+    """Open a simulated position on a BUY signal (one open trade per ticker)."""
+    try:
+        with db_conn() as con:
+            cur = con.execute(
+                "SELECT id FROM paper_trades WHERE ticker=? AND status='open'", (ticker,))
+            if cur.fetchone():
+                return
+            con.execute(
+                "INSERT INTO paper_trades (ticker, entry_price, entry_ts, stop_loss, take_profit) "
+                "VALUES (?,?,?,?,?)",
+                (ticker, round(price, 4), datetime.utcnow().isoformat(),
+                 round(stop_loss, 4), round(take_profit, 4)))
+        logger.info(f"📈 Paper trade ABIERTO: {ticker} @ ${round(price,2)}")
+    except Exception as e:
+        logger.warning(f"Open paper trade {ticker}: {e}")
+
+def _close_paper_trade(ticker, price, reason):
+    try:
+        with db_conn() as con:
+            con.execute(
+                "UPDATE paper_trades SET exit_price=?, exit_ts=?, exit_reason=?, status='closed' "
+                "WHERE ticker=? AND status='open'",
+                (round(price, 4), datetime.utcnow().isoformat(), reason, ticker))
+        logger.info(f"📉 Paper trade CERRADO: {ticker} @ ${round(price,2)} ({reason})")
+    except Exception as e:
+        logger.warning(f"Close paper trade {ticker}: {e}")
+
+def check_paper_trades(price_snapshot: dict):
+    """Close open paper trades whose stop loss or take profit was touched."""
+    try:
+        with db_conn() as con:
+            cur = con.execute(
+                "SELECT id, ticker, stop_loss, take_profit FROM paper_trades WHERE status='open'")
+            rows = cur.fetchall()
+        for tid, ticker, sl, tp in rows:
+            price = price_snapshot.get(ticker, 0)
+            if not price or price <= 0:
+                continue
+            if sl and price <= sl:
+                _close_paper_trade(ticker, sl, "stop_loss")
+            elif tp and price >= tp:
+                _close_paper_trade(ticker, tp, "take_profit")
+    except Exception as e:
+        logger.warning(f"check_paper_trades: {e}")
+
+def _load_signal_state():
+    """Restore last-known signals from DB so restarts don't re-alert everything."""
+    try:
+        with db_conn() as con:
+            cur = con.execute("SELECT ticker, signal FROM signal_state")
+            for ticker, sig in cur.fetchall():
+                signal_prev[ticker] = sig
+        logger.info(f"Signal state restored: {len(signal_prev)} tickers")
+    except Exception as e:
+        logger.warning(f"Load signal state: {e}")
+
+def _save_signal_state(ticker, signal):
+    try:
+        with db_conn() as con:
+            con.execute(
+                "INSERT INTO signal_state (ticker, signal) VALUES (?,?) "
+                "ON CONFLICT(ticker) DO UPDATE SET signal=excluded.signal",
+                (ticker, signal))
+    except Exception as e:
+        logger.warning(f"Save signal state {ticker}: {e}")
 
 def _empty_signal(ticker: str) -> dict:
     return {
@@ -579,11 +676,11 @@ async def signal_updater():
     while True:
         ticker = ALL_TICKERS[i % len(ALL_TICKERS)]
         try:
-            old_sig = indic_cache.get(ticker, {}).get("signal", "HOLD")
+            old_sig = signal_prev.get(ticker)  # persisted across restarts (no re-alert spam)
             result  = await loop.run_in_executor(_executor, compute_signal, ticker)
             new_sig = result.get("signal", "HOLD")
 
-            if old_sig != new_sig and new_sig in ("BUY", "SELL"):
+            if old_sig is not None and old_sig != new_sig and new_sig in ("BUY", "SELL"):
                 # Use price from the computed result, not from cache (avoids $0 alerts)
                 price       = result.get("indicators", {}).get("ema20", 0)  # fallback
                 cached_price = price_cache.get(ticker, {}).get("price", 0)
@@ -722,6 +819,9 @@ async def price_broadcast_loop():
             # Single DB query for all alerts instead of one per ticker
             triggered_alerts = check_all_price_alerts(price_snapshot)
 
+            # Close paper trades that touched their SL/TP
+            check_paper_trades(price_snapshot)
+
             await manager.broadcast({
                 "type": "prices", "data": updates,
                 "triggered_alerts": triggered_alerts,
@@ -735,6 +835,7 @@ async def price_broadcast_loop():
 async def lifespan(app: FastAPI):
     try:
         init_db()
+        _load_signal_state()
         logger.info("DB initialized OK")
     except Exception as e:
         logger.error(f"DB init failed (non-fatal): {e}")
@@ -843,25 +944,25 @@ def get_signal_performance(capital_per_trade: float = 1000.0):
             "pct_since": pct, "ts": ts,
         })
 
-    # pair BUY -> SELL into trades per ticker
-    open_pos: dict = {}   # ticker -> {entry_price, entry_ts}
-    trades = []
-    for ticker, signal, _, _, sig_price, ts in rows:
-        if not sig_price or sig_price <= 0:
-            continue
-        if signal == "BUY" and ticker not in open_pos:
-            open_pos[ticker] = {"entry_price": sig_price, "entry_ts": ts}
-        elif signal == "SELL" and ticker in open_pos:
-            pos = open_pos.pop(ticker)
-            trades.append({"ticker": ticker, "status": "closed",
-                           "entry_price": pos["entry_price"], "entry_ts": pos["entry_ts"],
-                           "exit_price": sig_price, "exit_ts": ts})
+    # real paper trades (opened on BUY, closed by SL/TP/SELL)
+    with db_conn() as con:
+        cur = con.execute(
+            "SELECT ticker, entry_price, entry_ts, stop_loss, take_profit, "
+            "exit_price, exit_ts, exit_reason, status "
+            "FROM paper_trades ORDER BY entry_ts DESC LIMIT 500")
+        trows = cur.fetchall()
     now_iso = datetime.utcnow().isoformat()
-    for ticker, pos in open_pos.items():
-        current = price_cache.get(ticker, {}).get("price", 0)
-        trades.append({"ticker": ticker, "status": "open",
-                       "entry_price": pos["entry_price"], "entry_ts": pos["entry_ts"],
-                       "exit_price": current if current > 0 else None, "exit_ts": None})
+    trades = []
+    for ticker, entry_price, entry_ts, sl, tp, exit_price, exit_ts, exit_reason, status in trows:
+        if status == "open":
+            current = price_cache.get(ticker, {}).get("price", 0)
+            exit_price = current if current > 0 else None
+            exit_ts = None
+        trades.append({"ticker": ticker, "status": status,
+                       "entry_price": entry_price, "entry_ts": entry_ts,
+                       "stop_loss": sl, "take_profit": tp,
+                       "exit_price": exit_price, "exit_ts": exit_ts,
+                       "exit_reason": exit_reason})
 
     def _days(a: str, b: str) -> float:
         try:
@@ -878,7 +979,6 @@ def get_signal_performance(capital_per_trade: float = 1000.0):
         else:
             t["pct"] = None
             t["pnl_usd"] = None
-    trades.sort(key=lambda t: t["entry_ts"], reverse=True)
 
     # aggregate stats (overall + per ticker)
     def _agg(ts_):
@@ -904,6 +1004,28 @@ def get_signal_performance(capital_per_trade: float = 1000.0):
                   "capital_per_trade": capital_per_trade},
         "per_ticker": {k: _agg(v) for k, v in per_ticker.items()},
     }
+
+class PaperTradeIn(BaseModel):
+    ticker: str
+    entry_price: float
+    entry_ts: Optional[str] = None
+    stop_loss: Optional[float] = None
+    take_profit: Optional[float] = None
+
+@app.post("/api/paper_trades")
+def add_paper_trade(t: PaperTradeIn):
+    """Manual backfill: register a paper trade (e.g. restore one lost to a redeploy)."""
+    with db_conn() as con:
+        cur = con.execute(
+            "SELECT id FROM paper_trades WHERE ticker=? AND status='open'", (t.ticker.upper(),))
+        if cur.fetchone():
+            return {"ok": False, "reason": "ya hay una operación abierta para este ticker"}
+        cur = con.execute(
+            "INSERT INTO paper_trades (ticker, entry_price, entry_ts, stop_loss, take_profit) "
+            "VALUES (?,?,?,?,?)",
+            (t.ticker.upper(), t.entry_price, t.entry_ts or datetime.utcnow().isoformat(),
+             t.stop_loss, t.take_profit))
+        return {"ok": True, "id": cur.lastrowid}
 
 # ── Portfolio ─────────────────────────────────────────────────────────────────
 

@@ -38,9 +38,9 @@ const TICKER_NAMES = {
 const ALL_TICKERS = Object.values(WATCHLIST).flat()
 
 const SIGNAL_CFG = {
-  BUY:  { label:'🟢 COMPRAR',  bg:'#0d3d20', border:'#16a34a', text:'#4ade80', glow:'#16a34a33' },
-  SELL: { label:'🔴 VENDER',   bg:'#571717', border:'#dc2626', text:'#f87171', glow:'#dc262633' },
-  HOLD: { label:'🟡 MANTENER', bg:'#2e2a08', border:'#ca8a04', text:'#facc15', glow:'#ca8a0433' },
+  BUY:  { label:'🟢 COMPRAR',  bg:'#175c32', border:'#16a34a', text:'#4ade80', glow:'#16a34a33' },
+  SELL: { label:'🔴 VENDER',   bg:'#702222', border:'#dc2626', text:'#f87171', glow:'#dc262633' },
+  HOLD: { label:'🟡 MANTENER', bg:'#46400f', border:'#ca8a04', text:'#facc15', glow:'#ca8a0433' },
 }
 
 const fmt  = (n, d=2) => n==null||n!==n ? '–' : n>=1000
@@ -72,12 +72,12 @@ function ConfidenceBar({ buyCount, sellCount, signal }) {
   return (
     <div>
       <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
-        <span style={{ fontSize:10, color:'#9aabc4', fontWeight:700, textTransform:'uppercase', letterSpacing:.5 }}>
+        <span style={{ fontSize:10, color:'#bac6da', fontWeight:700, textTransform:'uppercase', letterSpacing:.5 }}>
           Confianza
         </span>
         <span style={{ fontSize:11, color, fontWeight:700 }}>{label}</span>
       </div>
-      <div style={{ background:'#324158', borderRadius:20, height:8, overflow:'hidden' }}>
+      <div style={{ background:'#51617f', borderRadius:20, height:8, overflow:'hidden' }}>
         <div style={{
           width:`${pct}%`, height:'100%', borderRadius:20,
           background:`linear-gradient(90deg, ${color}88, ${color})`,
@@ -89,9 +89,9 @@ function ConfidenceBar({ buyCount, sellCount, signal }) {
           <div key={n} style={{
             width:14, height:14, borderRadius:'50%', fontSize:8, fontWeight:700,
             display:'flex', alignItems:'center', justifyContent:'center',
-            background: buyCount>=n ? color : '#324158',
-            border:`1px solid ${buyCount>=n ? color : '#5a6b85'}`,
-            color: buyCount>=n ? '#fff' : '#8294ad'
+            background: buyCount>=n ? color : '#51617f',
+            border:`1px solid ${buyCount>=n ? color : '#93a2bb'}`,
+            color: buyCount>=n ? '#fff' : '#aebbd1'
           }}>{n}</div>
         ))}
       </div>
@@ -121,23 +121,23 @@ function MiniSparkline({ data }) {
 
 function Card({ children, style }) {
   return (
-    <div style={{ background:'#1b2539', border:'1px solid #324158', borderRadius:8, padding:12, ...style }}>
+    <div style={{ background:'#38465f', border:'1px solid #51617f', borderRadius:8, padding:12, ...style }}>
       {children}
     </div>
   )
 }
 function StatBox({ label, value, color='#f1f5f9', sub }) {
   return (
-    <div style={{ background:'#324158', borderRadius:6, padding:'8px 12px', flex:1 }}>
-      <div style={{ fontSize:10, color:'#9aabc4', marginBottom:2 }}>{label}</div>
+    <div style={{ background:'#51617f', borderRadius:6, padding:'8px 12px', flex:1 }}>
+      <div style={{ fontSize:10, color:'#bac6da', marginBottom:2 }}>{label}</div>
       <div style={{ fontSize:14, fontWeight:700, color }}>{value}</div>
-      {sub && <div style={{ fontSize:10, color:'#8294ad', marginTop:1 }}>{sub}</div>}
+      {sub && <div style={{ fontSize:10, color:'#aebbd1', marginTop:1 }}>{sub}</div>}
     </div>
   )
 }
 function SectionTitle({ children }) {
   return (
-    <div style={{ fontSize:10, color:'#8294ad', fontWeight:700, letterSpacing:1,
+    <div style={{ fontSize:10, color:'#aebbd1', fontWeight:700, letterSpacing:1,
       textTransform:'uppercase', marginBottom:6 }}>{children}</div>
   )
 }
@@ -145,11 +145,11 @@ function Modal({ title, onClose, children }) {
   return (
     <div style={{ position:'fixed', inset:0, background:'rgba(0,0,0,.75)', zIndex:200,
       display:'flex', alignItems:'center', justifyContent:'center' }} onClick={onClose}>
-      <div style={{ background:'#1b2539', border:'1px solid #5a6b85', borderRadius:10,
+      <div style={{ background:'#38465f', border:'1px solid #93a2bb', borderRadius:10,
         padding:24, minWidth:340, maxWidth:480, width:'90%' }} onClick={e=>e.stopPropagation()}>
         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
           <h3 style={{ color:'#f1f5f9', fontWeight:700, margin:0 }}>{title}</h3>
-          <button onClick={onClose} style={{ background:'none', border:'none', color:'#bdc9dc', cursor:'pointer' }}>
+          <button onClick={onClose} style={{ background:'none', border:'none', color:'#d4dcea', cursor:'pointer' }}>
             <X size={18}/>
           </button>
         </div>
@@ -161,8 +161,8 @@ function Modal({ title, onClose, children }) {
 function FInput({ label, ...p }) {
   return (
     <div style={{ marginBottom:12 }}>
-      <label style={{ display:'block', fontSize:12, color:'#bdc9dc', marginBottom:4 }}>{label}</label>
-      <input {...p} style={{ width:'100%', background:'#324158', border:'1px solid #5a6b85',
+      <label style={{ display:'block', fontSize:12, color:'#d4dcea', marginBottom:4 }}>{label}</label>
+      <input {...p} style={{ width:'100%', background:'#51617f', border:'1px solid #93a2bb',
         borderRadius:6, padding:'8px 10px', color:'#f1f5f9', fontSize:14, outline:'none',
         boxSizing:'border-box' }}/>
     </div>
@@ -171,8 +171,8 @@ function FInput({ label, ...p }) {
 function FSelect({ label, children, ...p }) {
   return (
     <div style={{ marginBottom:12 }}>
-      <label style={{ display:'block', fontSize:12, color:'#bdc9dc', marginBottom:4 }}>{label}</label>
-      <select {...p} style={{ width:'100%', background:'#324158', border:'1px solid #5a6b85',
+      <label style={{ display:'block', fontSize:12, color:'#d4dcea', marginBottom:4 }}>{label}</label>
+      <select {...p} style={{ width:'100%', background:'#51617f', border:'1px solid #93a2bb',
         borderRadius:6, padding:'8px 10px', color:'#f1f5f9', fontSize:14, outline:'none' }}>
         {children}
       </select>
@@ -197,7 +197,7 @@ function Toasts({ toasts, onDismiss }) {
         const cfg = SIGNAL_CFG[t.signal] || SIGNAL_CFG.HOLD
         return (
           <div key={t.id} style={{
-            background:'#1b2539', border:`2px solid ${cfg.border}`,
+            background:'#38465f', border:`2px solid ${cfg.border}`,
             borderRadius:10, padding:'12px 14px', boxShadow:`0 4px 20px ${cfg.glow}`,
             animation:'slideIn .3s ease'
           }}>
@@ -206,23 +206,23 @@ function Toasts({ toasts, onDismiss }) {
                 🔔 {t.ticker} — {cfg.label}
               </span>
               <button onClick={()=>onDismiss(t.id)}
-                style={{ background:'none', border:'none', color:'#9aabc4', cursor:'pointer' }}>
+                style={{ background:'none', border:'none', color:'#bac6da', cursor:'pointer' }}>
                 <X size={14}/>
               </button>
             </div>
             {t.reasons?.length > 0 && (
-              <ul style={{ margin:0, padding:'0 0 0 14px', fontSize:11, color:'#bdc9dc' }}>
+              <ul style={{ margin:0, padding:'0 0 0 14px', fontSize:11, color:'#d4dcea' }}>
                 {t.reasons.map((r,i)=><li key={i}>{r}</li>)}
               </ul>
             )}
             <div style={{ display:'flex', gap:8, marginTop:8 }}>
               {t.stop_loss > 0 && (
-                <span style={{ fontSize:11, background:'#571717', color:'#f87171', padding:'2px 6px', borderRadius:4 }}>
+                <span style={{ fontSize:11, background:'#702222', color:'#f87171', padding:'2px 6px', borderRadius:4 }}>
                   Stop: {fmtU(t.stop_loss)}
                 </span>
               )}
               {t.take_profit > 0 && (
-                <span style={{ fontSize:11, background:'#0d3d20', color:'#4ade80', padding:'2px 6px', borderRadius:4 }}>
+                <span style={{ fontSize:11, background:'#175c32', color:'#4ade80', padding:'2px 6px', borderRadius:4 }}>
                   Objetivo: {fmtU(t.take_profit)}
                 </span>
               )}
@@ -246,7 +246,7 @@ function MarketAlert({ signals, prices }) {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:4, marginBottom:6 }}>
       {alerts.map((a,i) => (
-        <div key={i} style={{ background:'#1b2539', border:`1px solid ${a.color}55`,
+        <div key={i} style={{ background:'#38465f', border:`1px solid ${a.color}55`,
           borderRadius:6, padding:'6px 12px', display:'flex', alignItems:'center', gap:8 }}>
           <span>{a.icon}</span>
           <span style={{ fontSize:12, color:a.color, fontWeight:600 }}>{a.msg}</span>
@@ -300,8 +300,8 @@ function PerfView({ onClose, onSelect }) {
   }, [])
 
   if (!data) return (
-    <div style={{ position:'fixed', inset:0, background:'#111827', zIndex:150,
-      display:'flex', alignItems:'center', justifyContent:'center', color:'#8294ad' }}>
+    <div style={{ position:'fixed', inset:0, background:'#2b3950', zIndex:150,
+      display:'flex', alignItems:'center', justifyContent:'center', color:'#aebbd1' }}>
       Cargando rendimiento…
     </div>
   )
@@ -326,23 +326,23 @@ function PerfView({ onClose, onSelect }) {
     : `${v < 0 ? '-' : '+'}$${Math.abs(v).toLocaleString('es-MX', { minimumFractionDigits:2, maximumFractionDigits:2 })}`
   const chip = (active) => ({
     padding:'5px 14px', borderRadius:20, fontSize:12, fontWeight:700, cursor:'pointer',
-    background: active ? '#2c4d77' : '#202c47',
-    border: `1px solid ${active ? '#3b82f6' : '#324158'}`,
-    color: active ? '#60a5fa' : '#9aabc4',
+    background: active ? '#3a6396' : '#3e4d6b',
+    border: `1px solid ${active ? '#3b82f6' : '#51617f'}`,
+    color: active ? '#60a5fa' : '#bac6da',
   })
 
   return (
-    <div style={{ position:'fixed', inset:0, background:'#111827', zIndex:150,
+    <div style={{ position:'fixed', inset:0, background:'#2b3950', zIndex:150,
       display:'flex', flexDirection:'column', overflow:'hidden' }}>
       {/* Header */}
-      <div style={{ background:'#151e31', borderBottom:'1px solid #324158', padding:'12px 20px',
+      <div style={{ background:'#313f58', borderBottom:'1px solid #51617f', padding:'12px 20px',
         display:'flex', justifyContent:'space-between', alignItems:'center', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
           <Activity size={18} color="#3b82f6"/>
           <span style={{ fontWeight:800, fontSize:16, color:'#f1f5f9' }}>Rendimiento de Señales — Paper Trading</span>
         </div>
-        <button onClick={onClose} style={{ background:'#202c47', border:'1px solid #324158',
-          borderRadius:6, padding:'6px 14px', color:'#bdc9dc', cursor:'pointer', fontSize:13,
+        <button onClick={onClose} style={{ background:'#3e4d6b', border:'1px solid #51617f',
+          borderRadius:6, padding:'6px 14px', color:'#d4dcea', cursor:'pointer', fontSize:13,
           display:'flex', alignItems:'center', gap:6 }}><X size={14}/> Cerrar</button>
       </div>
 
@@ -366,7 +366,7 @@ function PerfView({ onClose, onSelect }) {
         {/* Filters */}
         <div style={{ display:'flex', gap:8, marginBottom:14, flexWrap:'wrap', alignItems:'center' }}>
           <select value={tickerFilter} onChange={e => setTickerFilter(e.target.value)}
-            style={{ background:'#202c47', border:'1px solid #324158', borderRadius:6,
+            style={{ background:'#3e4d6b', border:'1px solid #51617f', borderRadius:6,
               padding:'6px 10px', color:'#f1f5f9', fontSize:13, outline:'none' }}>
             <option value="ALL">Todas las acciones</option>
             {tickers.map(t => <option key={t} value={t}>{t} — {TICKER_NAMES[t] || t}</option>)}
@@ -383,13 +383,13 @@ function PerfView({ onClose, onSelect }) {
               const s = per_ticker[t]
               return (
                 <div key={t} onClick={() => setTickerFilter(t)} style={{
-                  background:'#1b2539', border:'1px solid #324158', borderRadius:8,
+                  background:'#38465f', border:'1px solid #51617f', borderRadius:8,
                   padding:'8px 12px', cursor:'pointer', minWidth:110 }}>
                   <div style={{ fontWeight:800, fontSize:13, color:'#f1f5f9' }}>{t}</div>
                   <div style={{ fontSize:11, color:pctC(s.total_pnl_usd), fontWeight:700 }}>
                     {s.total_pnl_usd>=0?'+':''}{fmtU(s.total_pnl_usd)}
                   </div>
-                  <div style={{ fontSize:10, color:'#8294ad' }}>{s.trades} trade{s.trades!==1?'s':''}</div>
+                  <div style={{ fontSize:10, color:'#aebbd1' }}>{s.trades} trade{s.trades!==1?'s':''}</div>
                 </div>
               )
             })}
@@ -398,16 +398,16 @@ function PerfView({ onClose, onSelect }) {
 
         {/* Trades table */}
         {!filtered.length ? (
-          <div style={{ textAlign:'center', color:'#5a6b85', padding:40, fontSize:14 }}>
+          <div style={{ textAlign:'center', color:'#93a2bb', padding:40, fontSize:14 }}>
             Aún no hay operaciones registradas con este filtro.<br/>
             <span style={{ fontSize:12 }}>Cada señal de COMPRA abre una posición simulada y cada VENTA la cierra.</span>
           </div>
         ) : (
-          <div style={{ background:'#1b2539', border:'1px solid #324158', borderRadius:10, overflow:'hidden' }}>
+          <div style={{ background:'#38465f', border:'1px solid #51617f', borderRadius:10, overflow:'hidden' }}>
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
               <thead>
-                <tr style={{ background:'#202c47', color:'#8294ad', fontSize:11, textTransform:'uppercase', letterSpacing:.5 }}>
-                  {['Activo','Estado','Entrada','Salida','Días','Resultado %','Resultado $'].map(h => (
+                <tr style={{ background:'#3e4d6b', color:'#aebbd1', fontSize:11, textTransform:'uppercase', letterSpacing:.5 }}>
+                  {['Activo','Estado','Entrada','SL / TP','Salida','Días','Resultado %','Resultado $'].map(h => (
                     <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontWeight:700 }}>{h}</th>
                   ))}
                 </tr>
@@ -415,32 +415,47 @@ function PerfView({ onClose, onSelect }) {
               <tbody>
                 {filtered.map((t, i) => (
                   <tr key={i} onClick={() => { onSelect(t.ticker); onClose() }}
-                    style={{ borderTop:'1px solid #2a3850', cursor:'pointer' }}
-                    onMouseEnter={e => e.currentTarget.style.background='#202c47'}
+                    style={{ borderTop:'1px solid #4d5d7c', cursor:'pointer' }}
+                    onMouseEnter={e => e.currentTarget.style.background='#3e4d6b'}
                     onMouseLeave={e => e.currentTarget.style.background='transparent'}>
                     <td style={{ padding:'9px 12px', fontWeight:800, color:'#f1f5f9' }}>
                       {t.ticker}
-                      <span style={{ fontSize:10, color:'#8294ad', marginLeft:6 }}>{TICKER_NAMES[t.ticker]}</span>
+                      <span style={{ fontSize:10, color:'#aebbd1', marginLeft:6 }}>{TICKER_NAMES[t.ticker]}</span>
                     </td>
                     <td style={{ padding:'9px 12px' }}>
                       <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:10,
-                        background: t.status==='open' ? '#2c4d77' : '#324158',
-                        color: t.status==='open' ? '#60a5fa' : '#bdc9dc' }}>
+                        background: t.status==='open' ? '#3a6396' : '#51617f',
+                        color: t.status==='open' ? '#60a5fa' : '#d4dcea' }}>
                         {t.status==='open' ? '● Abierta' : 'Cerrada'}
                       </span>
                     </td>
-                    <td style={{ padding:'9px 12px', color:'#bdc9dc' }}>
-                      {fmtU(t.entry_price)}<span style={{ color:'#8294ad', fontSize:11 }}> · {fmtDate(t.entry_ts)}</span>
+                    <td style={{ padding:'9px 12px', color:'#d4dcea' }}>
+                      {fmtU(t.entry_price)}<span style={{ color:'#aebbd1', fontSize:11 }}> · {fmtDate(t.entry_ts)}</span>
                     </td>
-                    <td style={{ padding:'9px 12px', color:'#bdc9dc' }}>
+                    <td style={{ padding:'9px 12px', fontSize:11 }}>
+                      <span style={{ color:'#f87171' }}>{t.stop_loss ? fmtU(t.stop_loss) : '–'}</span>
+                      <span style={{ color:'#93a2bb' }}> / </span>
+                      <span style={{ color:'#4ade80' }}>{t.take_profit ? fmtU(t.take_profit) : '–'}</span>
+                    </td>
+                    <td style={{ padding:'9px 12px', color:'#d4dcea' }}>
                       {t.exit_price ? <>
                         {fmtU(t.exit_price)}
-                        <span style={{ color:'#8294ad', fontSize:11 }}>
+                        <span style={{ color:'#aebbd1', fontSize:11 }}>
                           {t.exit_ts ? ` · ${fmtDate(t.exit_ts)}` : ' · actual'}
                         </span>
+                        {t.exit_reason && (
+                          <span style={{ marginLeft:6, fontSize:10, fontWeight:700, padding:'1px 6px',
+                            borderRadius:8,
+                            background: t.exit_reason==='take_profit' ? '#175c32'
+                              : t.exit_reason==='stop_loss' ? '#702222' : '#51617f',
+                            color: t.exit_reason==='take_profit' ? '#4ade80'
+                              : t.exit_reason==='stop_loss' ? '#f87171' : '#d4dcea' }}>
+                            {t.exit_reason==='take_profit' ? '🎯 TP' : t.exit_reason==='stop_loss' ? '🛑 SL' : 'Señal venta'}
+                          </span>
+                        )}
                       </> : '–'}
                     </td>
-                    <td style={{ padding:'9px 12px', color:'#bdc9dc' }}>{fmt(t.days_held,1)}</td>
+                    <td style={{ padding:'9px 12px', color:'#d4dcea' }}>{fmt(t.days_held,1)}</td>
                     <td style={{ padding:'9px 12px', fontWeight:700, color:pctC(t.pct) }}>
                       {t.pct != null ? `${t.pct>=0?'+':''}${fmt(t.pct)}%` : '–'}
                     </td>
@@ -454,7 +469,7 @@ function PerfView({ onClose, onSelect }) {
           </div>
         )}
 
-        <p style={{ fontSize:11, color:'#5a6b85', marginTop:14 }}>
+        <p style={{ fontSize:11, color:'#93a2bb', marginTop:14 }}>
           📋 Simulación: cada señal de COMPRA invierte ${(stats.capital_per_trade||1000).toLocaleString()} hipotéticos;
           la señal de VENTA cierra la posición. Las posiciones abiertas se valoran al precio actual.
           Esto es paper trading — ningún dinero real está en juego.
@@ -633,10 +648,10 @@ export default function App() {
   // ── Render ────────────────────────────────────────────────────────────────────
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100vh',
-      background:'#111827', color:'#e2e8f0', overflow:'hidden', fontFamily:'system-ui,sans-serif' }}>
+      background:'#2b3950', color:'#e2e8f0', overflow:'hidden', fontFamily:'system-ui,sans-serif' }}>
 
       {/* ══ TOP BAR ══ */}
-      <header style={{ background:'#151e31', borderBottom:'1px solid #324158',
+      <header style={{ background:'#313f58', borderBottom:'1px solid #51617f',
         padding:'0 16px', height:52, display:'flex', alignItems:'center',
         justifyContent:'space-between', flexShrink:0 }}>
         <div style={{ display:'flex', alignItems:'center', gap:10 }}>
@@ -649,11 +664,11 @@ export default function App() {
           {portfolio && (
             <>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:10, color:'#8294ad' }}>PORTAFOLIO</div>
+                <div style={{ fontSize:10, color:'#aebbd1' }}>PORTAFOLIO</div>
                 <div style={{ fontWeight:700, fontSize:14, color:'#f1f5f9' }}>{fmtU(portfolio.total_value)}</div>
               </div>
               <div style={{ textAlign:'right' }}>
-                <div style={{ fontSize:10, color:'#8294ad' }}>P&L</div>
+                <div style={{ fontSize:10, color:'#aebbd1' }}>P&L</div>
                 <div style={{ fontWeight:700, fontSize:14, color:pctC(portfolio.total_pnl) }}>
                   {portfolio.total_pnl>=0?'+':''}{fmtU(portfolio.total_pnl)}
                   <span style={{ fontSize:10, marginLeft:4 }}>
@@ -665,31 +680,31 @@ export default function App() {
           )}
           {/* Signal pills */}
           <div style={{ display:'flex', gap:5 }}>
-            <span style={{ background:'#0d3d20', border:'1px solid #16a34a', color:'#4ade80',
+            <span style={{ background:'#175c32', border:'1px solid #16a34a', color:'#4ade80',
               padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🟢 {buyCnt}</span>
-            <span style={{ background:'#571717', border:'1px solid #dc2626', color:'#f87171',
+            <span style={{ background:'#702222', border:'1px solid #dc2626', color:'#f87171',
               padding:'2px 10px', borderRadius:20, fontSize:11, fontWeight:700 }}>🔴 {sellCnt}</span>
           </div>
           {/* Performance view toggle */}
           <button onClick={() => setShowPerf(true)}
             title="Rendimiento de señales (paper trading)"
-            style={{ background:'none', border:'1px solid #324158',
-              borderRadius:6, padding:'4px 10px', color:'#8294ad', cursor:'pointer',
+            style={{ background:'none', border:'1px solid #51617f',
+              borderRadius:6, padding:'4px 10px', color:'#aebbd1', cursor:'pointer',
               display:'flex', alignItems:'center', gap:5, fontSize:11, fontWeight:700 }}>
             <TrendingUp size={14}/> Rendimiento
           </button>
           {/* Heatmap toggle */}
           <button onClick={() => setShowHeatmap(v => !v)}
             title="Heatmap de señales"
-            style={{ background: showHeatmap ? '#2c4d77' : 'none',
-              border:`1px solid ${showHeatmap ? '#3b82f6' : '#324158'}`,
-              borderRadius:6, padding:'4px 8px', color: showHeatmap ? '#60a5fa' : '#8294ad', cursor:'pointer' }}>
+            style={{ background: showHeatmap ? '#3a6396' : 'none',
+              border:`1px solid ${showHeatmap ? '#3b82f6' : '#51617f'}`,
+              borderRadius:6, padding:'4px 8px', color: showHeatmap ? '#60a5fa' : '#aebbd1', cursor:'pointer' }}>
             <Grid size={14}/>
           </button>
-          <div style={{ fontSize:10, color:'#5a6b85' }}>
+          <div style={{ fontSize:10, color:'#93a2bb' }}>
             {lastUpdate ? lastUpdate.toLocaleTimeString('es-MX') : 'Conectando...'}
           </div>
-          <button onClick={loadAll} style={{ background:'none', border:'none', color:'#8294ad', cursor:'pointer' }}>
+          <button onClick={loadAll} style={{ background:'none', border:'none', color:'#aebbd1', cursor:'pointer' }}>
             <RefreshCw size={14}/>
           </button>
         </div>
@@ -698,9 +713,9 @@ export default function App() {
       <div style={{ display:'flex', flex:1, overflow:'hidden' }}>
 
         {/* ══ LEFT PANEL ══ */}
-        <aside style={{ width:252, background:'#151e31', borderRight:'1px solid #324158',
+        <aside style={{ width:252, background:'#313f58', borderRight:'1px solid #51617f',
           display:'flex', flexDirection:'column', flexShrink:0 }}>
-          <div style={{ display:'flex', borderBottom:'1px solid #324158' }}>
+          <div style={{ display:'flex', borderBottom:'1px solid #51617f' }}>
             {[
               { id:'watchlist', icon:<List size={12}/>,      label:'Lista' },
               { id:'portfolio', icon:<Briefcase size={12}/>, label:'Portafolio' },
@@ -710,7 +725,7 @@ export default function App() {
               <button key={t.id} onClick={() => setLeftTab(t.id)} style={{
                 flex:1, padding:'9px 0', background:'none', border:'none',
                 borderBottom: leftTab===t.id ? '2px solid #3b82f6' : '2px solid transparent',
-                color: leftTab===t.id ? '#60a5fa' : '#8294ad',
+                color: leftTab===t.id ? '#60a5fa' : '#aebbd1',
                 cursor:'pointer', fontSize:11, fontWeight:600,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:4
               }}>{t.icon}{t.label}</button>
@@ -719,20 +734,20 @@ export default function App() {
 
           {/* Search + signal filter */}
           {leftTab === 'watchlist' && (
-            <div style={{ padding:'8px 8px 4px', borderBottom:'1px solid #2a3850' }}>
+            <div style={{ padding:'8px 8px 4px', borderBottom:'1px solid #4d5d7c' }}>
               <input value={search} onChange={e => setSearch(e.target.value)}
                 placeholder="🔍 Buscar acción…"
-                style={{ width:'100%', background:'#202c47', border:'1px solid #324158',
+                style={{ width:'100%', background:'#3e4d6b', border:'1px solid #51617f',
                   borderRadius:6, padding:'6px 9px', color:'#f1f5f9', fontSize:12,
                   outline:'none', boxSizing:'border-box', marginBottom:6 }}/>
               <div style={{ display:'flex', gap:4 }}>
-                {[['ALL','Todas','#9aabc4'],['BUY','🟢 Comprar','#4ade80'],
+                {[['ALL','Todas','#bac6da'],['BUY','🟢 Comprar','#4ade80'],
                   ['SELL','🔴 Vender','#f87171'],['HOLD','🟡 Mant.','#facc15']].map(([v,l,c]) => (
                   <button key={v} onClick={() => setSigFilter(v)} style={{
                     flex:1, padding:'4px 0', borderRadius:5, fontSize:10, fontWeight:700,
                     cursor:'pointer', whiteSpace:'nowrap',
-                    background: sigFilter===v ? '#2c4d77' : 'transparent',
-                    border:`1px solid ${sigFilter===v ? '#3b82f6' : '#324158'}`,
+                    background: sigFilter===v ? '#3a6396' : 'transparent',
+                    border:`1px solid ${sigFilter===v ? '#3b82f6' : '#51617f'}`,
                     color: sigFilter===v ? '#60a5fa' : c }}>{l}</button>
                 ))}
               </div>
@@ -752,7 +767,7 @@ export default function App() {
                 (SIG_ORDER[signals[a]?.signal]??3) - (SIG_ORDER[signals[b]?.signal]??3))
               return (
                 <div key={group}>
-                  <div style={{ fontSize:10, color:'#5a6b85', padding:'6px 10px 2px',
+                  <div style={{ fontSize:10, color:'#93a2bb', padding:'6px 10px 2px',
                     fontWeight:700, textTransform:'uppercase', letterSpacing:1 }}>{group}</div>
                   {sorted.map(ticker => {
                     const p   = prices[ticker] || {}
@@ -761,20 +776,20 @@ export default function App() {
                     return (
                       <div key={ticker} onClick={() => setSelected(ticker)} style={{
                         padding:'7px 10px', cursor:'pointer',
-                        background: isSel ? '#202c47' : 'transparent',
+                        background: isSel ? '#3e4d6b' : 'transparent',
                         borderLeft: isSel ? '3px solid #3b82f6' : '3px solid transparent',
                       }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                           <div>
                             <span style={{ fontWeight:700, fontSize:12, color:'#f1f5f9' }}>{ticker}</span>
                             {TICKER_NAMES[ticker] && (
-                              <span style={{ fontSize:10, color:'#8294ad', marginLeft:5 }}>{TICKER_NAMES[ticker]}</span>
+                              <span style={{ fontSize:10, color:'#aebbd1', marginLeft:5 }}>{TICKER_NAMES[ticker]}</span>
                             )}
                           </div>
                           {sig && <SignalBadge signal={sig.signal}/>}
                         </div>
                         <div style={{ display:'flex', justifyContent:'space-between', marginTop:1 }}>
-                          <span style={{ fontSize:12, color:'#cbd5e1' }}>{p.price ? fmtU(p.price) : '–'}</span>
+                          <span style={{ fontSize:12, color:'#e2e8f0' }}>{p.price ? fmtU(p.price) : '–'}</span>
                           <span style={{ fontSize:11, color:pctC(p.change_pct) }}>
                             {p.change_pct!=null ? `${p.change_pct>=0?'+':''}${fmt(p.change_pct)}%` : '–'}
                           </span>
@@ -787,7 +802,7 @@ export default function App() {
                                 width:6, height:6, borderRadius:'50%',
                                 background: sig.buy_count>=n
                                   ? (sig.signal==='BUY'?'#16a34a':sig.signal==='SELL'?'#dc2626':'#ca8a04')
-                                  : '#324158'
+                                  : '#51617f'
                               }}/>
                             ))}
                           </div>
@@ -809,11 +824,11 @@ export default function App() {
                   display:'flex', alignItems:'center', justifyContent:'center', gap:5, marginBottom:8
                 }}><Plus size={13}/> Agregar Posición</button>
                 {!portfolio?.positions?.length && (
-                  <p style={{ fontSize:12, color:'#5a6b85', textAlign:'center', marginTop:20 }}>Sin posiciones</p>
+                  <p style={{ fontSize:12, color:'#93a2bb', textAlign:'center', marginTop:20 }}>Sin posiciones</p>
                 )}
                 {portfolio?.positions?.map(pos => (
-                  <div key={pos.id} style={{ background:'#202c47', borderRadius:6,
-                    padding:9, marginBottom:6, border:'1px solid #324158' }}>
+                  <div key={pos.id} style={{ background:'#3e4d6b', borderRadius:6,
+                    padding:9, marginBottom:6, border:'1px solid #51617f' }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
                       <div style={{ display:'flex', alignItems:'center', gap:6 }}>
                         <span style={{ fontWeight:700, fontSize:12 }}>{pos.ticker}</span>
@@ -824,7 +839,7 @@ export default function App() {
                         <Trash2 size={12}/>
                       </button>
                     </div>
-                    <div style={{ fontSize:11, color:'#9aabc4', marginTop:2 }}>
+                    <div style={{ fontSize:11, color:'#bac6da', marginTop:2 }}>
                       {pos.quantity} × {fmtU(pos.entry_price)}
                     </div>
                     <div style={{ fontSize:12, color:pctC(pos.pnl), fontWeight:600, marginTop:2 }}>
@@ -845,7 +860,7 @@ export default function App() {
                   const sigAlerts = alerts.filter(a => a.alert_type?.startsWith('signal_'))
                   return sigAlerts.length > 0 && (
                     <div style={{ marginBottom:10 }}>
-                      <div style={{ fontSize:10, color:'#8294ad', fontWeight:700, letterSpacing:1,
+                      <div style={{ fontSize:10, color:'#aebbd1', fontWeight:700, letterSpacing:1,
                         textTransform:'uppercase', marginBottom:5 }}>🤖 Señales automáticas</div>
                       {sigAlerts.map(a => {
                         const isBuy = a.alert_type === 'signal_buy'
@@ -861,14 +876,14 @@ export default function App() {
                               </div>
                               <button onClick={() => deleteAlert(a.id)
                                 .then(() => fetchAlerts().then(({alerts:al})=>setAlerts(al)))}
-                                style={{ background:'none', border:'none', color:'#8294ad', cursor:'pointer' }}>
+                                style={{ background:'none', border:'none', color:'#aebbd1', cursor:'pointer' }}>
                                 <Trash2 size={11}/>
                               </button>
                             </div>
                             {parts.slice(1).map((p,i) => (
-                              <div key={i} style={{ fontSize:10, color:'#bdc9dc', marginTop:2 }}>{p}</div>
+                              <div key={i} style={{ fontSize:10, color:'#d4dcea', marginTop:2 }}>{p}</div>
                             ))}
-                            <div style={{ fontSize:10, color:'#8294ad', marginTop:3 }}>
+                            <div style={{ fontSize:10, color:'#aebbd1', marginTop:3 }}>
                               {new Date(a.created_at+'Z').toLocaleString('es-MX',
                                 {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
                             </div>
@@ -879,17 +894,17 @@ export default function App() {
                   )
                 })()}
                 {/* Manual price alerts */}
-                <div style={{ fontSize:10, color:'#8294ad', fontWeight:700, letterSpacing:1,
+                <div style={{ fontSize:10, color:'#aebbd1', fontWeight:700, letterSpacing:1,
                   textTransform:'uppercase', marginBottom:5 }}>💰 Alertas de precio</div>
                 <button onClick={() => setShowAddAlert(true)} style={{
-                  width:'100%', background:'#324158', border:'1px solid #5a6b85', borderRadius:6,
-                  padding:'7px 0', color:'#bdc9dc', fontWeight:600, fontSize:12, cursor:'pointer',
+                  width:'100%', background:'#51617f', border:'1px solid #93a2bb', borderRadius:6,
+                  padding:'7px 0', color:'#d4dcea', fontWeight:600, fontSize:12, cursor:'pointer',
                   display:'flex', alignItems:'center', justifyContent:'center', gap:5, marginBottom:6
                 }}><Plus size={13}/> Nueva alerta de precio</button>
                 {alerts.filter(a => a.alert_type==='price').map(a => (
                   <div key={a.id} style={{
-                    background: a.triggered ? '#13261a' : '#202c47',
-                    border:`1px solid ${a.triggered?'#166534':'#324158'}`,
+                    background: a.triggered ? '#1d3a28' : '#3e4d6b',
+                    border:`1px solid ${a.triggered?'#166534':'#51617f'}`,
                     borderRadius:6, padding:8, marginBottom:5
                   }}>
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -903,7 +918,7 @@ export default function App() {
                         </button>
                       </div>
                     </div>
-                    <div style={{ fontSize:11, color:'#bdc9dc', marginTop:2 }}>
+                    <div style={{ fontSize:11, color:'#d4dcea', marginTop:2 }}>
                       {a.direction==='above'?'↑ Sobre':'↓ Bajo'} {fmtU(a.target_price)}
                     </div>
                     <div style={{ fontSize:10, color:a.triggered?'#4ade80':'#facc15', marginTop:2 }}>
@@ -929,7 +944,7 @@ export default function App() {
               <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8 }}>
                 <SectionTitle>Heatmap de Señales — Top 20 Acciones</SectionTitle>
                 <button onClick={() => setShowHeatmap(false)}
-                  style={{ background:'none', border:'none', color:'#8294ad', cursor:'pointer' }}>
+                  style={{ background:'none', border:'none', color:'#aebbd1', cursor:'pointer' }}>
                   <X size={14}/>
                 </button>
               </div>
@@ -942,7 +957,7 @@ export default function App() {
             <div style={{ display:'flex', alignItems:'center', gap:10 }}>
               <h2 style={{ fontSize:22, fontWeight:800, color:'#f1f5f9', margin:0 }}>{selected}</h2>
               {TICKER_NAMES[selected] && (
-                <span style={{ fontSize:13, color:'#8294ad' }}>{TICKER_NAMES[selected]}</span>
+                <span style={{ fontSize:13, color:'#aebbd1' }}>{TICKER_NAMES[selected]}</span>
               )}
               {selPrice && (
                 <>
@@ -962,7 +977,7 @@ export default function App() {
           <Card style={{ flex:1, minHeight:0, padding:'10px 8px' }}>
             {(loading || chartLoading) ? (
               <div style={{ display:'flex', alignItems:'center', justifyContent:'center',
-                height:'100%', color:'#5a6b85' }}>Cargando datos...</div>
+                height:'100%', color:'#93a2bb' }}>Cargando datos...</div>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
                 <AreaChart data={chartData} margin={{ top:8, right:12, left:8, bottom:4 }}>
@@ -972,12 +987,12 @@ export default function App() {
                       <stop offset="95%" stopColor="#3b82f6" stopOpacity={0}/>
                     </linearGradient>
                   </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#324158"/>
-                  <XAxis dataKey="date" tick={{ fill:'#8294ad', fontSize:9 }} interval="preserveStartEnd"/>
-                  <YAxis domain={['auto','auto']} tick={{ fill:'#5a6b85', fontSize:10 }}
+                  <CartesianGrid strokeDasharray="3 3" stroke="#51617f"/>
+                  <XAxis dataKey="date" tick={{ fill:'#aebbd1', fontSize:9 }} interval="preserveStartEnd"/>
+                  <YAxis domain={['auto','auto']} tick={{ fill:'#93a2bb', fontSize:10 }}
                     tickFormatter={v=>`$${fmt(v,0)}`} width={60}/>
                   <Tooltip
-                    contentStyle={{ background:'#202c47', border:'1px solid #5a6b85', borderRadius:6, fontSize:12 }}
+                    contentStyle={{ background:'#3e4d6b', border:'1px solid #93a2bb', borderRadius:6, fontSize:12 }}
                     formatter={v=>[fmtU(v),'Precio']}/>
                   {ind.bb_upper > 0 && <ReferenceLine y={ind.bb_upper} stroke="#ca8a04" strokeDasharray="4 2"
                     label={{ value:'BB+', fill:'#ca8a04', fontSize:9 }}/>}
@@ -1009,10 +1024,10 @@ export default function App() {
               { label:'EMA 200',     value:fmtU(ind.ema200),  color:'#a78bfa' },
               { label:'BB Superior', value:fmtU(ind.bb_upper),color:'#fbbf24' },
               { label:'BB Inferior', value:fmtU(ind.bb_lower),color:'#fbbf24' },
-              { label:'ATR (14)',    value:fmtU(ind.atr),     color:'#bdc9dc' },
+              { label:'ATR (14)',    value:fmtU(ind.atr),     color:'#d4dcea' },
             ].map(({ label, value, color }) => (
-              <div key={label} style={{ background:'#151e31', border:'1px solid #324158', borderRadius:6, padding:'7px 10px' }}>
-                <div style={{ fontSize:9, color:'#5a6b85', marginBottom:2 }}>{label}</div>
+              <div key={label} style={{ background:'#313f58', border:'1px solid #51617f', borderRadius:6, padding:'7px 10px' }}>
+                <div style={{ fontSize:9, color:'#93a2bb', marginBottom:2 }}>{label}</div>
                 <div style={{ fontSize:13, fontWeight:700, color }}>{value || '–'}</div>
               </div>
             ))}
@@ -1020,10 +1035,10 @@ export default function App() {
         </main>
 
         {/* ══ RIGHT PANEL ══ */}
-        <aside style={{ width:240, background:'#151e31', borderLeft:'1px solid #324158',
+        <aside style={{ width:240, background:'#313f58', borderLeft:'1px solid #51617f',
           display:'flex', flexDirection:'column', flexShrink:0, overflowY:'auto' }}>
 
-          <div style={{ display:'flex', borderBottom:'1px solid #324158', flexShrink:0 }}>
+          <div style={{ display:'flex', borderBottom:'1px solid #51617f', flexShrink:0 }}>
             {[
               { id:'signal',  icon:<Activity size={12}/>, label:'Señal' },
               { id:'history', icon:<Clock size={12}/>,    label:'Historial' },
@@ -1031,7 +1046,7 @@ export default function App() {
               <button key={t.id} onClick={() => setRightTab(t.id)} style={{
                 flex:1, padding:'9px 0', background:'none', border:'none',
                 borderBottom: rightTab===t.id ? '2px solid #3b82f6' : '2px solid transparent',
-                color: rightTab===t.id ? '#60a5fa' : '#8294ad',
+                color: rightTab===t.id ? '#60a5fa' : '#aebbd1',
                 cursor:'pointer', fontSize:11, fontWeight:600,
                 display:'flex', alignItems:'center', justifyContent:'center', gap:4
               }}>{t.icon}{t.label}</button>
@@ -1061,41 +1076,41 @@ export default function App() {
                   <div>
                     <SectionTitle>Niveles Clave</SectionTitle>
                     <div style={{ display:'flex', flexDirection:'column', gap:5 }}>
-                      <div style={{ background:'#2b1518', border:'1px solid #7f1d1d', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ background:'#3d2125', border:'1px solid #7f1d1d', borderRadius:6, padding:'8px 10px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
                           <Shield size={12} color="#f87171"/>
-                          <span style={{ fontSize:10, color:'#bdc9dc', fontWeight:700 }}>STOP LOSS</span>
+                          <span style={{ fontSize:10, color:'#d4dcea', fontWeight:700 }}>STOP LOSS</span>
                         </div>
                         <div style={{ fontSize:14, fontWeight:800, color:'#f87171' }}>
                           {fmtU(selSig.stop_loss_buy)}
                         </div>
-                        <div style={{ fontSize:9, color:'#9aabc4' }}>
+                        <div style={{ fontSize:9, color:'#bac6da' }}>
                           −{fmtU(selPrice.price - selSig.stop_loss_buy)}
                           ({fmt((selPrice.price - selSig.stop_loss_buy)/selPrice.price*100)}%)
                         </div>
                       </div>
-                      <div style={{ background:'#13261a', border:'1px solid #1d6b3c', borderRadius:6, padding:'8px 10px' }}>
+                      <div style={{ background:'#1d3a28', border:'1px solid #1d6b3c', borderRadius:6, padding:'8px 10px' }}>
                         <div style={{ display:'flex', alignItems:'center', gap:5, marginBottom:2 }}>
                           <Target size={12} color="#4ade80"/>
-                          <span style={{ fontSize:10, color:'#bdc9dc', fontWeight:700 }}>OBJETIVO (TP)</span>
+                          <span style={{ fontSize:10, color:'#d4dcea', fontWeight:700 }}>OBJETIVO (TP)</span>
                         </div>
                         <div style={{ fontSize:14, fontWeight:800, color:'#4ade80' }}>
                           {fmtU(selSig.take_profit_buy)}
                         </div>
-                        <div style={{ fontSize:9, color:'#9aabc4' }}>
+                        <div style={{ fontSize:9, color:'#bac6da' }}>
                           +{fmtU(selSig.take_profit_buy - selPrice.price)}
                           ({fmt((selSig.take_profit_buy - selPrice.price)/selPrice.price*100)}%)
                         </div>
                       </div>
-                      <div style={{ background:'#202c47', border:'1px solid #324158', borderRadius:6, padding:'7px 10px' }}>
-                        <div style={{ fontSize:9, color:'#9aabc4', marginBottom:3 }}>SOPORTE / RESISTENCIA</div>
-                        <div style={{ fontSize:11, color:'#bdc9dc' }}>
+                      <div style={{ background:'#3e4d6b', border:'1px solid #51617f', borderRadius:6, padding:'7px 10px' }}>
+                        <div style={{ fontSize:9, color:'#bac6da', marginBottom:3 }}>SOPORTE / RESISTENCIA</div>
+                        <div style={{ fontSize:11, color:'#d4dcea' }}>
                           Soporte: <span style={{ color:'#4ade80', fontWeight:700 }}>{fmtU(selSig.support)}</span>
                         </div>
-                        <div style={{ fontSize:11, color:'#bdc9dc' }}>
+                        <div style={{ fontSize:11, color:'#d4dcea' }}>
                           Resistencia: <span style={{ color:'#f87171', fontWeight:700 }}>{fmtU(selSig.resistance)}</span>
                         </div>
-                        <div style={{ fontSize:9, color:'#8294ad', marginTop:3 }}>
+                        <div style={{ fontSize:9, color:'#aebbd1', marginTop:3 }}>
                           ATR: {fmtU(selSig.atr)} (volatilidad diaria)
                         </div>
                       </div>
@@ -1131,15 +1146,15 @@ export default function App() {
                 {selSig.signal !== 'BUY' && selSig.missing_buy_conditions?.length > 0 && (
                   <div>
                     <SectionTitle>🎯 Falta para COMPRAR</SectionTitle>
-                    <div style={{ background:'#1b2539', border:'1px solid #2c4d77',
+                    <div style={{ background:'#38465f', border:'1px solid #3a6396',
                       borderRadius:6, padding:'8px 10px' }}>
                       {selSig.missing_buy_conditions.map((r,i) => (
-                        <div key={i} style={{ fontSize:11, color:'#bdc9dc', marginBottom:3,
+                        <div key={i} style={{ fontSize:11, color:'#d4dcea', marginBottom:3,
                           display:'flex', gap:5, alignItems:'flex-start' }}>
                           <span style={{ color:'#3b82f6', flexShrink:0 }}>○</span><span>{r}</span>
                         </div>
                       ))}
-                      <div style={{ fontSize:10, color:'#5a6b85', marginTop:6, borderTop:'1px solid #324158', paddingTop:5 }}>
+                      <div style={{ fontSize:10, color:'#93a2bb', marginTop:6, borderTop:'1px solid #51617f', paddingTop:5 }}>
                         Necesita {Math.max(0, 3 - selSig.buy_count)} condición(es) más
                       </div>
                     </div>
@@ -1155,7 +1170,7 @@ export default function App() {
                     { s:'HOLD', label:'🟡 Mantener',count:Object.values(signals).filter(x=>x.signal==='HOLD').length },
                   ].map(({ label, count }) => (
                     <div key={label} style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}>
-                      <span style={{ fontSize:12, color:'#bdc9dc' }}>{label}</span>
+                      <span style={{ fontSize:12, color:'#d4dcea' }}>{label}</span>
                       <span style={{ fontSize:12, fontWeight:700, color:'#f1f5f9' }}>{count}</span>
                     </div>
                   ))}
@@ -1168,33 +1183,33 @@ export default function App() {
               <div>
                 <SectionTitle>Rendimiento de Señales</SectionTitle>
                 {perfStats?.evaluated > 0 && (
-                  <div style={{ background:'#1b2539', border:'1px solid #2c4d77', borderRadius:6,
+                  <div style={{ background:'#38465f', border:'1px solid #3a6396', borderRadius:6,
                     padding:'8px 10px', marginBottom:8 }}>
                     <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
-                      <span style={{ fontSize:11, color:'#bdc9dc' }}>Señales evaluadas</span>
+                      <span style={{ fontSize:11, color:'#d4dcea' }}>Señales evaluadas</span>
                       <span style={{ fontSize:11, fontWeight:700, color:'#f1f5f9' }}>{perfStats.evaluated}</span>
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
-                      <span style={{ fontSize:11, color:'#bdc9dc' }}>Aciertos</span>
+                      <span style={{ fontSize:11, color:'#d4dcea' }}>Aciertos</span>
                       <span style={{ fontSize:11, fontWeight:700,
                         color: perfStats.win_rate >= 50 ? '#4ade80' : '#f87171' }}>
                         {perfStats.win_rate}%
                       </span>
                     </div>
                     <div style={{ display:'flex', justifyContent:'space-between', padding:'2px 0' }}>
-                      <span style={{ fontSize:11, color:'#bdc9dc' }}>Promedio por señal</span>
+                      <span style={{ fontSize:11, color:'#d4dcea' }}>Promedio por señal</span>
                       <span style={{ fontSize:11, fontWeight:700,
                         color: perfStats.avg_pct >= 0 ? '#4ade80' : '#f87171' }}>
                         {perfStats.avg_pct >= 0 ? '+' : ''}{perfStats.avg_pct}%
                       </span>
                     </div>
-                    <div style={{ fontSize:9, color:'#8294ad', marginTop:4, borderTop:'1px solid #324158', paddingTop:4 }}>
+                    <div style={{ fontSize:9, color:'#aebbd1', marginTop:4, borderTop:'1px solid #51617f', paddingTop:4 }}>
                       Si hubieras seguido cada señal (paper trading)
                     </div>
                   </div>
                 )}
                 {!history.length && (
-                  <p style={{ fontSize:11, color:'#5a6b85' }}>
+                  <p style={{ fontSize:11, color:'#93a2bb' }}>
                     Sin señales registradas aún. El sistema irá anotando cada señal
                     de COMPRA/VENTA y aquí verás si habría ganado o perdido.
                   </p>
@@ -1202,7 +1217,7 @@ export default function App() {
                 {history.map((h,i) => {
                   const cfg = SIGNAL_CFG[h.signal] || SIGNAL_CFG.HOLD
                   return (
-                    <div key={i} style={{ background:'#202c47',
+                    <div key={i} style={{ background:'#3e4d6b',
                       border:`1px solid ${cfg.border}22`, borderRadius:6,
                       padding:'7px 9px', marginBottom:5 }}>
                       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
@@ -1217,7 +1232,7 @@ export default function App() {
                           <SignalBadge signal={h.signal}/>
                         </div>
                       </div>
-                      <div style={{ fontSize:11, color:'#9aabc4', marginTop:2 }}>
+                      <div style={{ fontSize:11, color:'#bac6da', marginTop:2 }}>
                         {fmtU(h.signal_price ?? h.price)} · {new Date(h.ts+'Z').toLocaleString('es-MX',
                           {month:'short',day:'numeric',hour:'2-digit',minute:'2-digit'})}
                       </div>
@@ -1275,8 +1290,8 @@ export default function App() {
       <style>{`
         @keyframes slideIn { from { opacity:0; transform:translateX(30px) } to { opacity:1; transform:none } }
         ::-webkit-scrollbar { width:4px }
-        ::-webkit-scrollbar-track { background:#151e31 }
-        ::-webkit-scrollbar-thumb { background:#324158; border-radius:2px }
+        ::-webkit-scrollbar-track { background:#313f58 }
+        ::-webkit-scrollbar-thumb { background:#51617f; border-radius:2px }
         * { box-sizing:border-box }
       `}</style>
     </div>
