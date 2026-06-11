@@ -20,8 +20,11 @@ import * as XLSX from 'xlsx'
 // ─── Constants ───────────────────────────────────────────────────────────────
 const WATCHLIST = {
   'Índices':         ['SPX', 'NDQ', 'DJI', 'VIX', 'DXY'],
-  'Top 20 Acciones': ['NVDA','AAPL','MSFT','GOOGL','AMZN','META','TSLA','AMD',
-                      'JPM','V','MA','LLY','COST','UNH','XOM','NFLX','PLTR','COIN','ASML','BRKB'],
+  'Acciones':        ['NVDA','AAPL','MSFT','GOOGL','AMZN','META','TSLA','AMD',
+                      'JPM','V','MA','LLY','COST','UNH','XOM','NFLX','PLTR','COIN','ASML','BRKB',
+                      'AVGO','ORCL','CRM','ADBE','BAC','WMT','DIS','INTC','QCOM','TXN',
+                      'CAT','GE','BA','GS','MS','PFE','MRK','ABBV','KO','PEP',
+                      'MCD','NKE','HD','CVX','T'],
   'Cripto':          ['BTCUSD', 'ETHUSD'],
   'Materias Primas': ['USOIL', 'XAUUSD'],
   'ETFs':            ['SPY', 'QQQ', 'IWM'],
@@ -35,6 +38,13 @@ const TICKER_NAMES = {
   SPX:'S&P 500',   NDQ:'Nasdaq 100', DJI:'Dow Jones',   VIX:'Volatilidad',
   DXY:'Dólar USD', BTCUSD:'Bitcoin', ETHUSD:'Ethereum', USOIL:'Petróleo',
   XAUUSD:'Oro',    SPY:'SPY ETF',    QQQ:'QQQ ETF',     IWM:'IWM ETF',
+  AVGO:'Broadcom', ORCL:'Oracle',    CRM:'Salesforce',  ADBE:'Adobe',
+  BAC:'BofA',      WMT:'Walmart',    DIS:'Disney',      INTC:'Intel',
+  QCOM:'Qualcomm', TXN:'Texas Inst', CAT:'Caterpillar', GE:'GE',
+  BA:'Boeing',     GS:'Goldman',     MS:'Morgan St',    PFE:'Pfizer',
+  MRK:'Merck',     ABBV:'AbbVie',    KO:'Coca-Cola',    PEP:'PepsiCo',
+  MCD:"McDonald's",NKE:'Nike',       HD:'Home Depot',   CVX:'Chevron',
+  T:'AT&T',
 }
 const ALL_TICKERS = Object.values(WATCHLIST).flat()
 
@@ -259,7 +269,7 @@ function MarketAlert({ signals, prices }) {
 
 // Heatmap de señales
 function SignalHeatmap({ signals, prices, onSelect }) {
-  const stocks = WATCHLIST['Top 20 Acciones']
+  const stocks = WATCHLIST['Acciones']
   return (
     <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:4 }}>
       {stocks.map(ticker => {
@@ -294,6 +304,7 @@ function PerfView({ onClose, onSelect }) {
   const [data,         setData]         = useState(null)
   const [tickerFilter, setTickerFilter] = useState('ALL')
   const [statusFilter, setStatusFilter] = useState('ALL')
+  const [trackFilter,  setTrackFilter]  = useState('ALL')
   const [dateFrom,     setDateFrom]     = useState('')
   const [dateTo,       setDateTo]       = useState('')
 
@@ -309,12 +320,13 @@ function PerfView({ onClose, onSelect }) {
     </div>
   )
 
-  const { trades = [], stats = {}, per_ticker = {} } = data
+  const { trades = [], stats = {} } = data
   const capital  = stats.capital_per_trade || 1000
-  const tickers  = Object.keys(per_ticker).sort()
+  const tickers  = [...new Set(trades.map(t => t.ticker))].sort()
   const filtered = trades.filter(t =>
     (tickerFilter === 'ALL' || t.ticker === tickerFilter) &&
     (statusFilter === 'ALL' || t.status === statusFilter) &&
+    (trackFilter  === 'ALL' || (t.track || 'A') === trackFilter) &&
     (!dateFrom || t.entry_ts.slice(0,10) >= dateFrom) &&
     (!dateTo   || t.entry_ts.slice(0,10) <= dateTo))
 
@@ -357,6 +369,7 @@ function PerfView({ onClose, onSelect }) {
       : r === 'sell_signal' ? 'Señal de venta' : ''
     const ops = filtered.map(t => ({
       'Activo': t.ticker, 'Nombre': TICKER_NAMES[t.ticker] || '',
+      'Pista': (t.track || 'A') === 'A' ? 'A - Normal' : 'B - Rápida',
       'Estado': t.status === 'open' ? 'Abierta' : 'Cerrada',
       'Fecha entrada': t.entry_ts?.slice(0,16).replace('T',' '),
       'Precio entrada': t.entry_price,
@@ -462,6 +475,10 @@ function PerfView({ onClose, onSelect }) {
           {[['ALL','Todas'],['open','Abiertas'],['closed','Cerradas']].map(([v,l]) => (
             <button key={v} onClick={() => setStatusFilter(v)} style={chip(statusFilter===v)}>{l}</button>
           ))}
+          <span style={{ width:1, height:20, background:'#51617f' }}/>
+          {[['ALL','A + B'],['A','🅰 Normal (~2 sem)'],['B','🅱 Rápida (~días)']].map(([v,l]) => (
+            <button key={v} onClick={() => setTrackFilter(v)} style={chip(trackFilter===v)}>{l}</button>
+          ))}
           <span style={{ fontSize:11, color:'#aebbd1', marginLeft:8 }}>Desde</span>
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
             style={{ background:'#3e4d6b', border:'1px solid #51617f', borderRadius:6,
@@ -502,20 +519,20 @@ function PerfView({ onClose, onSelect }) {
           </div>
         )}
 
-        {/* Per-ticker summary (only without ticker filter) */}
+        {/* Per-ticker summary (respeta filtros de pista/estado/fechas) */}
         {tickerFilter === 'ALL' && tickers.length > 1 && (
           <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:16 }}>
-            {tickers.map(t => {
-              const s = per_ticker[t]
+            {tickers.map(tk => {
+              const ts = filtered.filter(t => t.ticker === tk)
+              if (!ts.length) return null
+              const pnl = ts.reduce((s,t) => s + (t.pnl_usd || 0), 0)
               return (
-                <div key={t} onClick={() => setTickerFilter(t)} style={{
+                <div key={tk} onClick={() => setTickerFilter(tk)} style={{
                   background:'#38465f', border:'1px solid #51617f', borderRadius:8,
                   padding:'8px 12px', cursor:'pointer', minWidth:110 }}>
-                  <div style={{ fontWeight:800, fontSize:13, color:'#f1f5f9' }}>{t}</div>
-                  <div style={{ fontSize:11, color:pctC(s.total_pnl_usd), fontWeight:700 }}>
-                    {s.total_pnl_usd>=0?'+':''}{fmtU(s.total_pnl_usd)}
-                  </div>
-                  <div style={{ fontSize:10, color:'#aebbd1' }}>{s.trades} trade{s.trades!==1?'s':''}</div>
+                  <div style={{ fontWeight:800, fontSize:13, color:'#f1f5f9' }}>{tk}</div>
+                  <div style={{ fontSize:11, color:pctC(pnl), fontWeight:700 }}>{money(pnl)}</div>
+                  <div style={{ fontSize:10, color:'#aebbd1' }}>{ts.length} trade{ts.length!==1?'s':''}</div>
                 </div>
               )
             })}
@@ -533,7 +550,7 @@ function PerfView({ onClose, onSelect }) {
             <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
               <thead>
                 <tr style={{ background:'#3e4d6b', color:'#aebbd1', fontSize:11, textTransform:'uppercase', letterSpacing:.5 }}>
-                  {['Activo','Estado','Entrada','SL / TP','Salida','Días','Resultado %','Resultado $'].map(h => (
+                  {['Activo','Pista','Estado','Entrada','SL / TP','Salida','Días','Resultado %','Resultado $'].map(h => (
                     <th key={h} style={{ padding:'10px 12px', textAlign:'left', fontWeight:700 }}>{h}</th>
                   ))}
                 </tr>
@@ -547,6 +564,14 @@ function PerfView({ onClose, onSelect }) {
                     <td style={{ padding:'9px 12px', fontWeight:800, color:'#f1f5f9' }}>
                       {t.ticker}
                       <span style={{ fontSize:10, color:'#aebbd1', marginLeft:6 }}>{TICKER_NAMES[t.ticker]}</span>
+                    </td>
+                    <td style={{ padding:'9px 12px' }}>
+                      <span title={(t.track||'A')==='A' ? 'Normal: SL 2×ATR / TP 3×ATR' : 'Rápida: SL 1×ATR / TP 1.5×ATR'}
+                        style={{ fontSize:11, fontWeight:800, padding:'2px 8px', borderRadius:10,
+                        background: (t.track||'A')==='A' ? '#3a6396' : '#46400f',
+                        color: (t.track||'A')==='A' ? '#93c5fd' : '#facc15' }}>
+                        {(t.track||'A')==='A' ? '🅰' : '🅱'}
+                      </span>
                     </td>
                     <td style={{ padding:'9px 12px' }}>
                       <span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:10,

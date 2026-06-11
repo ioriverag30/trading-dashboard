@@ -171,15 +171,25 @@ def _finnhub_candles(symbol: str, days: int = 365) -> Optional[pd.DataFrame]:
 
 # ─── Watchlist & symbol maps ──────────────────────────────────────────────────
 
+EXTRA_STOCKS = ["AVGO","ORCL","CRM","ADBE","BAC","WMT","DIS","INTC","QCOM","TXN",
+                "CAT","GE","BA","GS","MS","PFE","MRK","ABBV","KO","PEP",
+                "MCD","NKE","HD","CVX","T"]
+
 WATCHLIST = {
     "indices":     ["SPX", "NDQ", "DJI", "VIX", "DXY"],
     "stocks":      ["NVDA","AAPL","MSFT","GOOGL","AMZN","META","TSLA","AMD",
-                    "JPM","V","MA","LLY","COST","UNH","XOM","NFLX","PLTR","COIN","ASML","BRKB"],
+                    "JPM","V","MA","LLY","COST","UNH","XOM","NFLX","PLTR","COIN","ASML","BRKB"]
+                   + EXTRA_STOCKS,
     "crypto":      ["BTCUSD", "ETHUSD"],
     "commodities": ["USOIL", "XAUUSD"],
     "etfs":        ["SPY", "QQQ", "IWM"],
 }
 ALL_TICKERS = [t for g in WATCHLIST.values() for t in g]
+
+# plain US tickers resolve to themselves on both data providers
+for _t in EXTRA_STOCKS:
+    FINNHUB_SYMBOLS.setdefault(_t, _t)
+    TD_SYMBOLS.setdefault(_t, _t)
 
 YF_SYMBOLS = {
     "SPX":  "^GSPC", "NDQ": "^NDX",  "DJI": "^DJI",
@@ -267,6 +277,11 @@ def init_db():
         # migrate: add alert_type column if missing
         try:
             con.execute("ALTER TABLE alerts ADD COLUMN alert_type TEXT NOT NULL DEFAULT 'price'")
+        except Exception:
+            pass
+        # migrate: add track column (A = normal 2/3 ATR, B = rápida 1/1.5 ATR)
+        try:
+            con.execute("ALTER TABLE paper_trades ADD COLUMN track TEXT NOT NULL DEFAULT 'A'")
         except Exception:
             pass
 
@@ -441,13 +456,12 @@ def compute_signal(ticker: str) -> dict:
                              take_profit_buy if signal == "BUY" else take_profit_sell,
                              active_buy_reasons if signal == "BUY" else active_sell_reasons)
             if signal == "BUY":
-                _open_paper_trade(ticker, live_price,
-                                  live_price - 2 * atr, live_price + 3 * atr)
+                _open_both_tracks(ticker, live_price, atr)
             else:
                 _close_paper_trade(ticker, live_price, "sell_signal")
         elif prev_sig_str is None and signal == "BUY":
             # first sight of a ticker already in BUY: open quietly (no alert spam)
-            _open_paper_trade(ticker, live_price, live_price - 2 * atr, live_price + 3 * atr)
+            _open_both_tracks(ticker, live_price, atr)
         if prev_sig_str != signal:
             _save_signal_state(ticker, signal)
         signal_prev[ticker] = signal
@@ -518,22 +532,29 @@ def _save_signal_event(ticker, signal, buy_count, sell_count, price):
 
 # ─── Paper trading (operaciones simuladas) ───────────────────────────────────
 
-def _open_paper_trade(ticker, price, stop_loss, take_profit):
-    """Open a simulated position on a BUY signal (one open trade per ticker)."""
+def _open_paper_trade(ticker, price, stop_loss, take_profit, track="A"):
+    """Open a simulated position on a BUY signal (one open trade per ticker per track)."""
     try:
         with db_conn() as con:
             cur = con.execute(
-                "SELECT id FROM paper_trades WHERE ticker=? AND status='open'", (ticker,))
+                "SELECT id FROM paper_trades WHERE ticker=? AND track=? AND status='open'",
+                (ticker, track))
             if cur.fetchone():
                 return
             con.execute(
-                "INSERT INTO paper_trades (ticker, entry_price, entry_ts, stop_loss, take_profit) "
-                "VALUES (?,?,?,?,?)",
+                "INSERT INTO paper_trades (ticker, entry_price, entry_ts, stop_loss, take_profit, track) "
+                "VALUES (?,?,?,?,?,?)",
                 (ticker, round(price, 4), datetime.utcnow().isoformat(),
-                 round(stop_loss, 4), round(take_profit, 4)))
-        logger.info(f"📈 Paper trade ABIERTO: {ticker} @ ${round(price,2)}")
+                 round(stop_loss, 4), round(take_profit, 4), track))
+        logger.info(f"📈 Paper trade ABIERTO [{track}]: {ticker} @ ${round(price,2)}")
     except Exception as e:
         logger.warning(f"Open paper trade {ticker}: {e}")
+
+def _open_both_tracks(ticker, price, atr):
+    """Track A: swing normal (SL 2×ATR / TP 3×ATR, ~2 semanas).
+    Track B: rápida (SL 1×ATR / TP 1.5×ATR, ~1-3 días)."""
+    _open_paper_trade(ticker, price, price - 2 * atr, price + 3 * atr, "A")
+    _open_paper_trade(ticker, price, price - 1 * atr, price + 1.5 * atr, "B")
 
 def _close_paper_trade(ticker, price, reason):
     try:
@@ -667,7 +688,7 @@ async def price_updater():
         except Exception as e:
             logger.warning(f"Price updater {ticker}: {e}")
         i += 1
-        await asyncio.sleep(6)
+        await asyncio.sleep(4)  # 55 tickers -> ciclo completo ~3.7 min (Finnhub: 60 req/min)
 
 async def signal_updater():
     await asyncio.sleep(60)
@@ -948,17 +969,17 @@ def get_signal_performance(capital_per_trade: float = 1000.0):
     with db_conn() as con:
         cur = con.execute(
             "SELECT ticker, entry_price, entry_ts, stop_loss, take_profit, "
-            "exit_price, exit_ts, exit_reason, status "
-            "FROM paper_trades ORDER BY entry_ts DESC LIMIT 500")
+            "exit_price, exit_ts, exit_reason, status, track "
+            "FROM paper_trades ORDER BY entry_ts DESC LIMIT 1000")
         trows = cur.fetchall()
     now_iso = datetime.utcnow().isoformat()
     trades = []
-    for ticker, entry_price, entry_ts, sl, tp, exit_price, exit_ts, exit_reason, status in trows:
+    for ticker, entry_price, entry_ts, sl, tp, exit_price, exit_ts, exit_reason, status, track in trows:
         if status == "open":
             current = price_cache.get(ticker, {}).get("price", 0)
             exit_price = current if current > 0 else None
             exit_ts = None
-        trades.append({"ticker": ticker, "status": status,
+        trades.append({"ticker": ticker, "status": status, "track": track or "A",
                        "entry_price": entry_price, "entry_ts": entry_ts,
                        "stop_loss": sl, "take_profit": tp,
                        "exit_price": exit_price, "exit_ts": exit_ts,
