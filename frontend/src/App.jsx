@@ -15,6 +15,7 @@ import {
 
 const API_BASE = (import.meta.env.VITE_API_URL || '') + '/api'
 import { useWebSocket } from './useWebSocket.js'
+import * as XLSX from 'xlsx'
 
 // ─── Constants ───────────────────────────────────────────────────────────────
 const WATCHLIST = {
@@ -351,21 +352,45 @@ function PerfView({ onClose, onSelect }) {
       v: +(acc += t.pnl_usd).toFixed(2) }))
   })()
 
-  const downloadCSV = () => {
-    const head = ['Activo','Estado','Fecha entrada','Precio entrada','Stop Loss','Take Profit',
-                  'Fecha salida','Precio salida','Motivo cierre','Dias','Resultado %','Resultado USD']
-    const rows = filtered.map(t => [
-      t.ticker, t.status === 'open' ? 'Abierta' : 'Cerrada',
-      t.entry_ts?.slice(0,16).replace('T',' '), t.entry_price, t.stop_loss ?? '', t.take_profit ?? '',
-      t.exit_ts ? t.exit_ts.slice(0,16).replace('T',' ') : '', t.exit_price ?? '',
-      t.exit_reason === 'take_profit' ? 'Take Profit' : t.exit_reason === 'stop_loss' ? 'Stop Loss'
-        : t.exit_reason === 'sell_signal' ? 'Señal de venta' : '',
-      t.days_held, t.pct ?? '', t.pnl_usd ?? '',
-    ])
-    const csv  = '﻿' + [head, ...rows].map(r => r.join(';')).join('\n')
-    const url  = URL.createObjectURL(new Blob([csv], { type:'text/csv;charset=utf-8' }))
-    const a    = Object.assign(document.createElement('a'), { href:url, download:`rendimiento_${new Date().toISOString().slice(0,10)}.csv` })
-    a.click(); URL.revokeObjectURL(url)
+  const downloadExcel = () => {
+    const reasonTxt = r => r === 'take_profit' ? 'Take Profit' : r === 'stop_loss' ? 'Stop Loss'
+      : r === 'sell_signal' ? 'Señal de venta' : ''
+    const ops = filtered.map(t => ({
+      'Activo': t.ticker, 'Nombre': TICKER_NAMES[t.ticker] || '',
+      'Estado': t.status === 'open' ? 'Abierta' : 'Cerrada',
+      'Fecha entrada': t.entry_ts?.slice(0,16).replace('T',' '),
+      'Precio entrada': t.entry_price,
+      'Stop Loss': t.stop_loss ?? null, 'Take Profit': t.take_profit ?? null,
+      'Fecha salida': t.exit_ts ? t.exit_ts.slice(0,16).replace('T',' ') : '',
+      'Precio salida': t.exit_price ?? null,
+      'Motivo cierre': reasonTxt(t.exit_reason),
+      'Días en posición': t.days_held,
+      'Resultado %': t.pct ?? null, 'Resultado USD': t.pnl_usd ?? null,
+      'Capital por trade': capital,
+    }))
+    const resumen = [
+      { 'Métrica': 'Capital invertido (abiertas)',  'Valor': fStats.capOpen },
+      { 'Métrica': 'Ganancia realizada (USD)',      'Valor': +fStats.realized.toFixed(2) },
+      { 'Métrica': 'Ganancia realizada (%)',        'Valor': fStats.realizedPct != null ? +fStats.realizedPct.toFixed(2) : null },
+      { 'Métrica': 'Ganancia no realizada (USD)',   'Valor': +fStats.unrealized.toFixed(2) },
+      { 'Métrica': 'Resultado total (USD)',         'Valor': +fStats.total.toFixed(2) },
+      { 'Métrica': 'Aciertos % (cerradas)',         'Valor': fStats.win },
+      { 'Métrica': 'Operaciones ganadas',           'Valor': fStats.nWin },
+      { 'Métrica': 'Operaciones perdidas',          'Valor': fStats.nLose },
+      { 'Métrica': 'Días promedio hasta ganancia',  'Valor': fStats.daysToWin != null ? +fStats.daysToWin.toFixed(1) : null },
+      { 'Métrica': 'Días promedio en posición',     'Valor': fStats.daysAll != null ? +fStats.daysAll.toFixed(1) : null },
+      { 'Métrica': 'Operaciones abiertas',          'Valor': fStats.open.length },
+      { 'Métrica': 'Operaciones cerradas',          'Valor': fStats.closed.length },
+      { 'Métrica': 'Generado',                      'Valor': new Date().toLocaleString('es-MX') },
+    ]
+    const wb  = XLSX.utils.book_new()
+    const ws1 = XLSX.utils.json_to_sheet(ops)
+    ws1['!cols'] = Object.keys(ops[0] || {'':''}).map(k => ({ wch: Math.max(k.length + 2, 14) }))
+    XLSX.utils.book_append_sheet(wb, ws1, 'Operaciones')
+    const ws2 = XLSX.utils.json_to_sheet(resumen)
+    ws2['!cols'] = [{ wch: 32 }, { wch: 18 }]
+    XLSX.utils.book_append_sheet(wb, ws2, 'Resumen')
+    XLSX.writeFile(wb, `rendimiento_${new Date().toISOString().slice(0,10)}.xlsx`)
   }
 
   const fmtDate = ts => new Date(ts + 'Z').toLocaleDateString('es-MX', { day:'numeric', month:'short' })
@@ -405,10 +430,10 @@ function PerfView({ onClose, onSelect }) {
             sub={fStats.realizedPct != null
               ? `${fStats.realizedPct>=0?'+':''}${fmt(fStats.realizedPct)}% sobre $${fStats.capClosed.toLocaleString()} cerrados`
               : 'sin operaciones cerradas aún'}/>
-          <StatBox label="GANANCIA NO REALIZADA" color={pctC(fStats.unrealized)}
+          <StatBox label="GANANCIA NO REALIZADA ⓘ" color={pctC(fStats.unrealized)}
             value={money(fStats.unrealized)}
             sub={fStats.unrealizedPct != null
-              ? `${fStats.unrealizedPct>=0?'+':''}${fmt(fStats.unrealizedPct)}% de las abiertas (flotante)` : '–'}/>
+              ? `${fStats.unrealizedPct>=0?'+':''}${fmt(fStats.unrealizedPct)}% flotante — mide exposición, no éxito` : '–'}/>
           <StatBox label="RESULTADO TOTAL" color={pctC(fStats.total)}
             value={money(fStats.total)}
             sub={fStats.totalPct != null ? `${fStats.totalPct>=0?'+':''}${fmt(fStats.totalPct)}% del capital usado` : '–'}/>
@@ -448,8 +473,8 @@ function PerfView({ onClose, onSelect }) {
           {(dateFrom || dateTo) && (
             <button onClick={() => { setDateFrom(''); setDateTo('') }} style={chip(false)}>✕ Fechas</button>
           )}
-          <button onClick={downloadCSV} style={{ ...chip(false), marginLeft:'auto',
-            display:'flex', alignItems:'center', gap:5 }}>⬇ Exportar Excel (CSV)</button>
+          <button onClick={downloadExcel} style={{ ...chip(false), marginLeft:'auto',
+            display:'flex', alignItems:'center', gap:5 }}>⬇ Exportar Excel</button>
         </div>
 
         {/* Ganancia acumulada (cerradas) */}
