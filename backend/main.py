@@ -582,10 +582,11 @@ def check_paper_trades(price_snapshot: dict):
     try:
         with db_conn() as con:
             cur = con.execute(
-                "SELECT id, ticker, stop_loss, take_profit, entry_ts, track FROM paper_trades WHERE status='open'")
+                "SELECT id, ticker, entry_price, stop_loss, take_profit, entry_ts, track "
+                "FROM paper_trades WHERE status='open'")
             rows = cur.fetchall()
         now = datetime.utcnow()
-        for tid, ticker, sl, tp, entry_ts, track in rows:
+        for tid, ticker, entry_price, sl, tp, entry_ts, track in rows:
             track = track or "A"
             price = price_snapshot.get(ticker, 0)
             if not price or price <= 0:
@@ -595,9 +596,12 @@ def check_paper_trades(price_snapshot: dict):
             elif tp and price >= tp:
                 _close_paper_trade(ticker, tp, "take_profit", track)
             elif track in TRACK_MAX_DAYS:
+                # Time stop inteligente: pasado el plazo, cerrar SOLO si la operación
+                # no está en ganancia ("dinero muerto"). Las ganadoras siguen corriendo
+                # hasta su TP — nunca se cierra una buena operación por el reloj.
                 try:
                     age = (now - datetime.fromisoformat(entry_ts)).total_seconds() / 86400
-                    if age >= TRACK_MAX_DAYS[track]:
+                    if age >= TRACK_MAX_DAYS[track] and price <= entry_price:
                         _close_paper_trade(ticker, price, "time_stop", track)
                 except Exception:
                     pass

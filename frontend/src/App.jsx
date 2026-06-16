@@ -366,7 +366,7 @@ function PerfView({ onClose, onSelect }) {
 
   const downloadExcel = () => {
     const reasonTxt = r => r === 'take_profit' ? 'Take Profit' : r === 'stop_loss' ? 'Stop Loss'
-      : r === 'sell_signal' ? 'Señal de venta' : r === 'time_stop' ? 'Límite de tiempo' : ''
+      : r === 'sell_signal' ? 'Señal de venta' : r === 'time_stop' ? 'Cerrada sin avance (3d)' : ''
     const ops = filtered.map(t => ({
       'Activo': t.ticker, 'Nombre': TICKER_NAMES[t.ticker] || '',
       'Pista': (t.track || 'A') === 'A' ? 'A - Normal' : 'B - Rápida',
@@ -602,7 +602,7 @@ function PerfView({ onClose, onSelect }) {
                             color: t.exit_reason==='take_profit' ? '#4ade80'
                               : t.exit_reason==='stop_loss' ? '#f87171' : '#d4dcea' }}>
                             {t.exit_reason==='take_profit' ? '🎯 TP' : t.exit_reason==='stop_loss' ? '🛑 SL'
-                              : t.exit_reason==='time_stop' ? '⏱ Tiempo' : 'Señal venta'}
+                              : t.exit_reason==='time_stop' ? '⏱ Sin avance' : 'Señal venta'}
                           </span>
                         )}
                       </> : '–'}
