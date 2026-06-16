@@ -556,32 +556,51 @@ def _open_both_tracks(ticker, price, atr):
     _open_paper_trade(ticker, price, price - 2 * atr, price + 3 * atr, "A")
     _open_paper_trade(ticker, price, price - 1 * atr, price + 1.5 * atr, "B")
 
-def _close_paper_trade(ticker, price, reason):
+# Track B is the "fast" strategy: also close after this many days regardless of SL/TP.
+TRACK_MAX_DAYS = {"B": 3}
+
+def _close_paper_trade(ticker, price, reason, track=None):
+    """Close open trade(s) for a ticker. If track given, only that track."""
     try:
         with db_conn() as con:
-            con.execute(
-                "UPDATE paper_trades SET exit_price=?, exit_ts=?, exit_reason=?, status='closed' "
-                "WHERE ticker=? AND status='open'",
-                (round(price, 4), datetime.utcnow().isoformat(), reason, ticker))
-        logger.info(f"📉 Paper trade CERRADO: {ticker} @ ${round(price,2)} ({reason})")
+            if track:
+                con.execute(
+                    "UPDATE paper_trades SET exit_price=?, exit_ts=?, exit_reason=?, status='closed' "
+                    "WHERE ticker=? AND track=? AND status='open'",
+                    (round(price, 4), datetime.utcnow().isoformat(), reason, ticker, track))
+            else:
+                con.execute(
+                    "UPDATE paper_trades SET exit_price=?, exit_ts=?, exit_reason=?, status='closed' "
+                    "WHERE ticker=? AND status='open'",
+                    (round(price, 4), datetime.utcnow().isoformat(), reason, ticker))
+        logger.info(f"📉 Paper trade CERRADO [{track or 'all'}]: {ticker} @ ${round(price,2)} ({reason})")
     except Exception as e:
         logger.warning(f"Close paper trade {ticker}: {e}")
 
 def check_paper_trades(price_snapshot: dict):
-    """Close open paper trades whose stop loss or take profit was touched."""
+    """Close open paper trades on stop loss, take profit, or time limit (per track)."""
     try:
         with db_conn() as con:
             cur = con.execute(
-                "SELECT id, ticker, stop_loss, take_profit FROM paper_trades WHERE status='open'")
+                "SELECT id, ticker, stop_loss, take_profit, entry_ts, track FROM paper_trades WHERE status='open'")
             rows = cur.fetchall()
-        for tid, ticker, sl, tp in rows:
+        now = datetime.utcnow()
+        for tid, ticker, sl, tp, entry_ts, track in rows:
+            track = track or "A"
             price = price_snapshot.get(ticker, 0)
             if not price or price <= 0:
                 continue
             if sl and price <= sl:
-                _close_paper_trade(ticker, sl, "stop_loss")
+                _close_paper_trade(ticker, sl, "stop_loss", track)
             elif tp and price >= tp:
-                _close_paper_trade(ticker, tp, "take_profit")
+                _close_paper_trade(ticker, tp, "take_profit", track)
+            elif track in TRACK_MAX_DAYS:
+                try:
+                    age = (now - datetime.fromisoformat(entry_ts)).total_seconds() / 86400
+                    if age >= TRACK_MAX_DAYS[track]:
+                        _close_paper_trade(ticker, price, "time_stop", track)
+                except Exception:
+                    pass
     except Exception as e:
         logger.warning(f"check_paper_trades: {e}")
 
