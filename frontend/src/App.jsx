@@ -980,10 +980,11 @@ export default function App() {
                         borderBottom: `1px solid ${C.bg}`,
                       }}>
                         <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:8 }}>
-                          <div style={{ minWidth:0, overflow:'hidden' }}>
-                            <span style={{ fontWeight:700, fontSize:FS.sm, color:C.textHi }}>{ticker}</span>
+                          <div style={{ display:'flex', alignItems:'baseline', gap:5, minWidth:0, flex:1 }}>
+                            <span style={{ fontWeight:700, fontSize:FS.sm, color:C.textHi, flexShrink:0 }}>{ticker}</span>
                             {TICKER_NAMES[ticker] && (
-                              <span style={{ fontSize:FS.xxs, color:C.muted, marginLeft:5 }}>{TICKER_NAMES[ticker]}</span>
+                              <span style={{ fontSize:FS.xxs, color:C.muted, whiteSpace:'nowrap',
+                                overflow:'hidden', textOverflow:'ellipsis' }}>{TICKER_NAMES[ticker]}</span>
                             )}
                           </div>
                           <div style={{ display:'flex', alignItems:'center', gap:8, flexShrink:0 }}>
@@ -991,7 +992,11 @@ export default function App() {
                             <span style={{ fontSize:FS.xs, color:pctC(p.change_pct), minWidth:52, textAlign:'right' }}>
                               {p.change_pct!=null ? `${p.change_pct>=0?'+':''}${fmt(p.change_pct)}%` : '–'}
                             </span>
-                            {sig && <SignalBadge signal={sig.signal}/>}
+                            {/* Solo COMPRAR/VENDER llevan badge; MANTENER recede (un punto tenue) */}
+                            {sig && sig.signal !== 'HOLD'
+                              ? <SignalBadge signal={sig.signal}/>
+                              : <span style={{ width:8, height:8, borderRadius:'50%',
+                                  background:C.border, flexShrink:0 }} title="Mantener"/>}
                           </div>
                         </div>
                         {/* Detalle solo en el activo seleccionado */}
