@@ -191,18 +191,6 @@ for _t in EXTRA_STOCKS:
     FINNHUB_SYMBOLS.setdefault(_t, _t)
     TD_SYMBOLS.setdefault(_t, _t)
 
-YF_SYMBOLS = {
-    "SPX":  "^GSPC", "NDQ": "^NDX",  "DJI": "^DJI",
-    "VIX":  "^VIX",  "DXY": "DX-Y.NYB",
-    "NVDA": "NVDA",  "AAPL": "AAPL",  "MSFT": "MSFT",  "GOOGL": "GOOGL",
-    "AMZN": "AMZN",  "META": "META",  "TSLA": "TSLA",  "AMD":  "AMD",
-    "JPM":  "JPM",   "V":    "V",     "MA":   "MA",    "LLY":  "LLY",
-    "COST": "COST",  "UNH":  "UNH",  "XOM":  "XOM",   "NFLX": "NFLX",
-    "PLTR": "PLTR",  "COIN": "COIN", "ASML": "ASML",  "BRKB": "BRK-B",
-    "BTCUSD": "BTC-USD", "ETHUSD": "ETH-USD",
-    "USOIL": "CL=F", "XAUUSD": "GC=F",
-    "SPY": "SPY", "QQQ": "QQQ", "IWM": "IWM",
-}
 COINGECKO_IDS = {"BTCUSD": "bitcoin", "ETHUSD": "ethereum"}
 
 # ─── In-memory caches ────────────────────────────────────────────────────────
@@ -317,16 +305,16 @@ def refresh_price(ticker: str):
 # ─── Technical indicators ─────────────────────────────────────────────────────
 
 BUY_LABELS = [
-    "RSI < 40 (sobreventa)",
-    "MACD cruza ↑ señal (momentum alcista)",
-    "Precio ≤ Banda Bollinger inferior",
+    "RSI < 30 (sobreventa real)",
+    "MACD cruza ↑ señal con momentum",
+    "Rebote desde Banda Bollinger inferior",
     "Precio > EMA 200 (tendencia alcista)",
     "Pico de volumen > 150% promedio",
 ]
 SELL_LABELS = [
-    "RSI > 65 (sobrecompra)",
-    "MACD cruza ↓ señal (momentum bajista)",
-    "Precio ≥ Banda Bollinger superior",
+    "RSI > 70 (sobrecompra real)",
+    "MACD cruza ↓ señal con momentum",
+    "Rechazo desde Banda Bollinger superior",
     "Precio < EMA 50 (pérdida de soporte)",
     "Vela bajista con volumen alto",
 ]
@@ -389,34 +377,41 @@ def compute_signal(ticker: str) -> dict:
         volume_spike = vol_now > vol_avg * 1.5 if vol_avg else False
 
         price_now       = float(close.iloc[-1])
+        price_prev      = float(close.iloc[-2])
+        bb_lower_prev   = float((ma20 - 2 * std20).iloc[-2])
+        bb_upper_prev   = float((ma20 + 2 * std20).iloc[-2])
         macd_cross_up   = prev_macd <= prev_sig and macd > macd_sig
         macd_cross_down = prev_macd >= prev_sig and macd < macd_sig
+        # MACD cross must have real momentum: reject crosses deep in negative/positive territory
+        macd_pct        = abs(macd) / price_now if price_now else 0
+        macd_strong_up  = macd_cross_up and macd > -0.005 * price_now
+        macd_strong_down= macd_cross_down and macd < 0.005 * price_now
 
-        # Signal conditions
+        # Signal conditions (v2 — stricter, fewer but higher-quality entries)
         buy_conds = [
-            rsi < 40,
-            macd_cross_up,
-            price_now <= bb_lower and bb_lower > 0,
-            price_now > ema200 and ema200 > 0,
-            volume_spike,
+            rsi < 30,                                         # real oversold, not just "dipping"
+            macd_strong_up,                                   # cross with actual momentum behind it
+            price_prev <= bb_lower_prev and price_now > bb_lower,  # BOUNCE off lower band (not just touching)
+            price_now > ema200 and ema200 > 0,                # long-term uptrend intact
+            volume_spike,                                     # conviction behind the move
         ]
         sell_conds = [
-            rsi > 65,
-            macd_cross_down,
-            price_now >= bb_upper and bb_upper > 0,
-            price_now < ema50 and ema50 > 0,
-            volume_spike and macd < 0,
+            rsi > 70,                                         # real overbought
+            macd_strong_down,                                 # cross with momentum
+            price_prev >= bb_upper_prev and price_now < bb_upper,  # rejection from upper band
+            price_now < ema50 and ema50 > 0,                  # lost medium-term support
+            volume_spike and macd < 0,                        # selling pressure confirmed
         ]
         buy_count  = sum(buy_conds)
         sell_count = sum(sell_conds)
 
-        signal = "BUY" if buy_count >= 3 else ("SELL" if sell_count >= 3 else "HOLD")
+        signal = "BUY" if buy_count >= 4 else ("SELL" if sell_count >= 4 else "HOLD")
 
-        # Stop loss & take profit (ATR-based)
-        stop_loss_buy    = round(price_now - 2 * atr, 4)
-        stop_loss_sell   = round(price_now + 2 * atr, 4)
-        take_profit_buy  = round(price_now + 3 * atr, 4)
-        take_profit_sell = round(price_now - 3 * atr, 4)
+        # Stop loss & take profit (ATR-based, widened to survive normal noise)
+        stop_loss_buy    = round(price_now - 2.5 * atr, 4)
+        stop_loss_sell   = round(price_now + 2.5 * atr, 4)
+        take_profit_buy  = round(price_now + 4 * atr, 4)
+        take_profit_sell = round(price_now - 4 * atr, 4)
         support          = round(max(bb_lower, ema50 if ema50 > 0 else bb_lower), 2)
         resistance       = round(min(bb_upper, ema20 * 1.02), 2)
 
@@ -551,13 +546,13 @@ def _open_paper_trade(ticker, price, stop_loss, take_profit, track="A"):
         logger.warning(f"Open paper trade {ticker}: {e}")
 
 def _open_both_tracks(ticker, price, atr):
-    """Track A: swing normal (SL 2×ATR / TP 3×ATR, ~2 semanas).
-    Track B: rápida (SL 1×ATR / TP 1.5×ATR, ~1-3 días)."""
-    _open_paper_trade(ticker, price, price - 2 * atr, price + 3 * atr, "A")
-    _open_paper_trade(ticker, price, price - 1 * atr, price + 1.5 * atr, "B")
+    """Track A: swing (SL 2.5×ATR / TP 4×ATR, ~2-3 semanas).
+    Track B: rápida (SL 1.5×ATR / TP 2.5×ATR, ~3-5 días)."""
+    _open_paper_trade(ticker, price, price - 2.5 * atr, price + 4 * atr, "A")
+    _open_paper_trade(ticker, price, price - 1.5 * atr, price + 2.5 * atr, "B")
 
 # Track B is the "fast" strategy: also close after this many days regardless of SL/TP.
-TRACK_MAX_DAYS = {"B": 3}
+TRACK_MAX_DAYS = {"B": 5}
 
 def _close_paper_trade(ticker, price, reason, track=None):
     """Close open trade(s) for a ticker. If track given, only that track."""
