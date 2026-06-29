@@ -305,14 +305,14 @@ def refresh_price(ticker: str):
 # ─── Technical indicators ─────────────────────────────────────────────────────
 
 BUY_LABELS = [
-    "RSI < 30 (sobreventa real)",
+    "RSI < 35 (sobreventa moderada)",
     "MACD cruza ↑ señal con momentum",
     "Rebote desde Banda Bollinger inferior",
     "Precio > EMA 200 (tendencia alcista)",
     "Pico de volumen > 150% promedio",
 ]
 SELL_LABELS = [
-    "RSI > 70 (sobrecompra real)",
+    "RSI > 65 (sobrecompra moderada)",
     "MACD cruza ↓ señal con momentum",
     "Rechazo desde Banda Bollinger superior",
     "Precio < EMA 50 (pérdida de soporte)",
@@ -389,14 +389,14 @@ def compute_signal(ticker: str) -> dict:
 
         # Signal conditions (v2 — stricter, fewer but higher-quality entries)
         buy_conds = [
-            rsi < 30,                                         # real oversold, not just "dipping"
+            rsi < 35,                                         # moderate oversold (not extreme, but real)
             macd_strong_up,                                   # cross with actual momentum behind it
             price_prev <= bb_lower_prev and price_now > bb_lower,  # BOUNCE off lower band (not just touching)
             price_now > ema200 and ema200 > 0,                # long-term uptrend intact
             volume_spike,                                     # conviction behind the move
         ]
         sell_conds = [
-            rsi > 70,                                         # real overbought
+            rsi > 65,                                         # moderate overbought
             macd_strong_down,                                 # cross with momentum
             price_prev >= bb_upper_prev and price_now < bb_upper,  # rejection from upper band
             price_now < ema50 and ema50 > 0,                  # lost medium-term support
@@ -405,7 +405,7 @@ def compute_signal(ticker: str) -> dict:
         buy_count  = sum(buy_conds)
         sell_count = sum(sell_conds)
 
-        signal = "BUY" if buy_count >= 4 else ("SELL" if sell_count >= 4 else "HOLD")
+        signal = "BUY" if buy_count >= 3 else ("SELL" if sell_count >= 3 else "HOLD")
 
         # Stop loss & take profit (ATR-based, widened to survive normal noise)
         stop_loss_buy    = round(price_now - 2.5 * atr, 4)

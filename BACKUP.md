@@ -1,7 +1,20 @@
 # 📊 Claude Bolsa — Backup & Estado del Proyecto
-**Última actualización:** 6 Jun 2026  
+**Última actualización:** 6 Jun 2026 (commit 3340ef6)
 **GitHub:** https://github.com/ioriverag30/trading-dashboard  
 **Railway (backend):** https://trading-dashboard-production-be2d.up.railway.app  
+
+---
+
+## ✅ Estado Actual — TODO FUNCIONA
+
+| Componente | Estado |
+|------------|--------|
+| Railway backend | ✅ Online (port 8080) |
+| yfinance datos | ✅ Browser User-Agent bypass activo |
+| ntfy alertas | ✅ Canal Trading-Alerts |
+| market_monitor | ✅ Activo (SPX -2%, VIX ≥25) |
+| daily_summary | ✅ 9am ET push notification |
+| Frontend nuevas features | ✅ Commiteado y deployando |
 
 ---
 
@@ -15,7 +28,7 @@ Claude Bolsa/
 │   └── __init__.py
 ├── frontend/
 │   ├── src/
-│   │   └── App.jsx      ← Dashboard React completo
+│   │   └── App.jsx      ← Dashboard React completo con nuevas features
 │   ├── .env.production  ← VITE_API_URL=https://...railway.app
 │   └── package.json
 ├── Dockerfile           ← Build para Railway
@@ -58,24 +71,22 @@ npm run preview
 - **App:** ntfy.sh (gratis, ya instalada en el cel)
 - **Canal:** `Trading-Alerts`
 - **URL:** https://ntfy.sh/Trading-Alerts
-- Las alertas se mandan cuando una acción cambia de HOLD → BUY o → SELL
-- **Funciona aunque la Mac esté apagada** (cuando Railway esté arriba)
+- Alertas cuando una acción cambia de HOLD → BUY o → SELL
+- **market_monitor:** alerta automática si SPX cae ≥2% o VIX ≥25 (cada 5 min)
+- **daily_summary:** resumen de BUYs activos cada día a las 9am ET (14:00 UTC)
+- **Funciona aunque la Mac esté apagada** (Railway siempre corre)
 
 ---
 
-## ☁️ Estado del Deploy en Railway
+## ☁️ Railway — Problema 502 RESUELTO
 
-### ✅ Lo que funciona:
-- El servidor **arranca correctamente** (logs confirman: "Application startup complete")
-- Uvicorn corre en `0.0.0.0:8080` (Railway asigna PORT=8080 dinámicamente)
-- El código de la app está correcto
+### Causa raíz:
+Railway inyecta `PORT=8080` como variable de sistema oculta, pero la configuración de Networking tenía "Custom port: 8000". El app escuchaba en 8080, Railway enrutaba al 8000 → 502.
 
-### ✅ RESUELTO:
-- Railway devuelve **502** con `x-railway-fallback: true`
-- Esto significa que Railway no puede conectar su proxy con el container
-- El servidor corre pero Railway no "ve" el puerto
+### Fix:
+Railway Dashboard → Settings → Networking → cambiar Custom port de 8000 a **8080**.
 
-### 🔧 Fixes intentados (commits en orden):
+### Historial de commits del debugging:
 | Commit | Fix | Resultado |
 |--------|-----|-----------|
 | `a2c5978` | Dockerfile básico | 502 |
@@ -86,24 +97,9 @@ npm run preview
 | `9f0af4c` | python main.py directo | 502 (server arranca ✅) |
 | `09329b1` | ThreadPool limitado + /health | 502 |
 | `8c6d7f3` | EXPOSE 8000 + ENV PORT=8000 | ✅ FUNCIONA - Puerto 8080 correcto |
-| `187d007` | Sin healthcheck en railway.toml | ✅ FUNCIONA - Puerto 8080 correcto |
-
-### 🔍 Para diagnosticar en Railway Dashboard:
-1. Ve a **Settings** del servicio → busca "Networking" o "Ports"
-2. Confirma que el "Internal Port" sea 8000
-3. Si hay opción "Generate Domain" → verifica que esté activada
-4. Revisa que el plan tenga créditos ($5 trial)
-
-### 🆘 Si Railway sigue fallando — Alternativa Render.com:
-```
-1. Ve a https://render.com
-2. New → Web Service
-3. Conecta el repo: github.com/ioriverag30/trading-dashboard
-4. Runtime: Docker
-5. Plan: Free
-6. Environment Variables: (ninguna necesaria)
-7. Deploy → listo en ~5 min
-```
+| `187d007` | Sin healthcheck en railway.toml | ✅ FUNCIONA |
+| `d109092` | Full rewrite + yfinance bypass | ✅ FUNCIONA |
+| `3340ef6` | market_monitor + daily_summary + UI overhaul | ✅ FUNCIONA |
 
 ---
 
@@ -119,16 +115,16 @@ npm run preview
 
 ---
 
-## 📊 Cómo funciona el sistema de señales
+## 📊 Sistema de Señales
 
-### Indicadores usados:
+### Indicadores:
 - **RSI** (14 períodos) — sobrecompra/sobreventa
 - **MACD** — momentum y cruces
 - **EMA 20/50** — tendencia
 - **Bollinger Bands** — volatilidad
-- **ATR** — para calcular Stop Loss y Take Profit
+- **ATR** — para Stop Loss y Take Profit
 
-### Señal BUY (necesita 3/5 condiciones):
+### BUY (necesita 3/5 condiciones):
 1. RSI < 35 (sobreventa)
 2. MACD positivo (momentum alcista)
 3. Precio > EMA50 (tendencia alcista)
@@ -138,7 +134,38 @@ npm run preview
 ### Stop Loss y Take Profit:
 - **SL** = Precio − ATR × 2
 - **TP** = Precio + ATR × 3
-- **R:R** = 1:1.5 (por cada $1 arriesgas, buscas $1.50 de ganancia)
+- **R:R** = 1:1.5
+
+---
+
+## 🆕 Features Implementadas (commit 3340ef6)
+
+### Backend (`backend/main.py`):
+- **`market_monitor()`** — monitorea SPX y VIX cada 5 min, envía ntfy si SPX cae ≥2% o VIX ≥25
+- **`daily_summary()`** — envía resumen matutino a las 9am ET con todos los BUYs activos
+- **`_yf_ticker(sym)`** — browser User-Agent para bypasear bloqueo de Yahoo Finance en datacenters
+- **`@contextmanager db_conn()`** — conexiones DB con auto-commit/rollback/close
+- **`check_all_price_alerts(price_snapshot)`** — 1 sola query DB para todos los tickers (antes eran 30)
+- **`missing_buy_conditions`** — campo nuevo en cada señal: qué condiciones faltan para BUY
+- **`/health`** — endpoint de health con info de port y tickers en cache
+
+### Frontend (`frontend/src/App.jsx`):
+- **`ConfidenceBar`** — barra 0-100% con 5 dots mostrando condiciones cumplidas
+- **`SignalHeatmap`** — grid 4×5 de top 20 acciones con colores por señal
+- **`MarketAlert`** — banner automático si SPX cae ≥2% o VIX ≥25
+- **"Falta para COMPRAR"** — panel lateral con condiciones que faltan para BUY
+- **Mini dots** en cada fila del watchlist
+- **Sparkline fix** — filtra valores cero que hacían el gráfico siempre verde
+- **Toggle heatmap** — botón en header para mostrar/ocultar el heatmap
+
+---
+
+## 🔮 Funciones Pendientes
+
+1. **Deploy frontend a Vercel** — acceder al dashboard desde el cel
+2. **Multi-timeframe** — análisis en diario + 4h + 1h simultáneo
+3. **Integración IBKR** — leer posiciones reales cuando aprueben la cuenta
+4. **Backtesting** — probar la estrategia con datos históricos
 
 ---
 
@@ -147,19 +174,8 @@ npm run preview
 - **Broker:** Interactive Brokers (cuenta en proceso de aprobación)
 - **Modo:** Paper Trading primero para probar
 - **Estrategia recomendada:** Swing trading (3-10 días por posición)
-- **Regla PDT:** Con menos de $25K no puedes hacer más de 3 day trades en 5 días (para acciones USA). Crypto no tiene esta restricción.
-- **Comisiones IBKR:** ~$1 por orden (mínimo), muy bajo
-- **Spread:** Acciones como AAPL/MSFT tienen spreads de $0.01-0.04, insignificante
-
----
-
-## 🔮 Funciones Pendientes por Implementar
-
-1. **"¿Qué falta para BUY?"** — mostrar qué condición le falta a cada acción
-2. **Barra de confianza** — 0-100% visual según condiciones cumplidas
-3. **Multi-timeframe** — análisis en diario + 4h + 1h simultáneo
-4. **Integración IBKR** — leer posiciones reales cuando aprueben la cuenta
-5. **Deploy frontend** — subir el dashboard a Vercel para acceder desde el cel
+- **Regla PDT:** Con menos de $25K no puedes hacer más de 3 day trades en 5 días (acciones USA). Crypto no tiene esta restricción.
+- **Comisiones IBKR:** ~$1 por orden (mínimo)
 
 ---
 
@@ -168,6 +184,7 @@ npm run preview
 - **GitHub user:** ioriverag30
 - **Repo:** https://github.com/ioriverag30/trading-dashboard
 - **Railway domain:** trading-dashboard-production-be2d.up.railway.app
+- **Railway port:** 8080 (IMPORTANTE — no cambiar)
 - **ntfy canal:** Trading-Alerts
 - **Backend port local:** 8000
 - **Frontend port local:** 5173
